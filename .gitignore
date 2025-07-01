@@ -1,0 +1,41 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Dependency directories ingnore
+env/
+venv/
+.venv/
+env2/
+venv2/
+env3/
+venv3/
+
+# Secret keys
+*.env
+
+# Static files
+staticfiles/
+media/
+
+# Database
+db.sqlite3
+
+# IDE files
+.idea/
+.vscode/
+
+# Compiled Python bytecode
+*.pyc
+
+# Environment-specific files
+.env.local
+.env.development
+.env.test
+.env.staging
+.env.production
+
+# System files
+.DS_Store
+Thumbs.db
