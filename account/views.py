@@ -66,9 +66,10 @@ class UserRegistrationView(APIView):
                         'success': True,
                         'status':200,
                         'message': f'Registration successful & OTP create Failed',
+                        'email_sent': False,
                         'error': f'OTP create Failed: {str(e)}',
                         'token': token,
-                        'new_user': user_data,
+                        'user': user_data,
                         
                         },status=status.HTTP_200_OK)
                 #Send the Mail OTP verification
@@ -89,7 +90,7 @@ class UserRegistrationView(APIView):
                     'message': 'Registration successful & OTP sent to email address',
                     'email_sent': True,
                     'token': token,
-                    'new_user': user_data,
+                    'user': user_data,
                     
                     },status=status.HTTP_200_OK)
                 else:
@@ -98,7 +99,7 @@ class UserRegistrationView(APIView):
                         'status': status.HTTP_200_OK,
                         'message': 'Registration successful & OTP sending failed to email address',
                         'email_sent': True,
-                        'new_user': user_data,
+                        'user': user_data,
                         'token': token,
                         
                     }, status=status.HTTP_200_OK)
