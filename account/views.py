@@ -4,15 +4,17 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
-from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer
+from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer,VerifyEmailSerializer
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth import login
 from .utils import generate_unique_otp,send_email
-from account.models import OtpToken
+from account.models import OtpToken,User
 from rest_framework.exceptions import AuthenticationFailed,ValidationError
 from drf_yasg.utils import swagger_auto_schema
 import re
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.permissions import IsAuthenticated
 
 
 # token generator
@@ -23,6 +25,122 @@ def get_tokens_for_user(user):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
+
+class VerifyEmailView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    renderer_classes = [UserRenderer]
+
+    @swagger_auto_schema(request_body=VerifyEmailSerializer)
+    def post(self, request):
+
+        required_fields = [ 'otp_code']
+        for field in required_fields:
+            if field not in request.data or not request.data[field]:
+                return Response({
+                    'success': False,
+                    'status': status.HTTP_400_BAD_REQUEST,
+                    'message': f'{field} is missing or empty',
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        otp_code = request.data.get('otp_code')
+        user_email = request.user.email
+
+        # Retrieve the OTP token associated with the user's email
+        try:
+            otp_token = OtpToken.objects.filter(user__email=user_email, is_used=False).last()
+            if otp_token is None:
+                return Response({
+                    'success': False,
+                    'status': status.HTTP_404_NOT_FOUND,
+                    'message': 'OTP is already used or Not found.',
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+        except OtpToken.DoesNotExist:
+            return Response({
+                'success': False,
+                'status': status.HTTP_404_NOT_FOUND,
+                'message': 'The OTP is invalid.',
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                'success': False,
+                'status': status.HTTP_500_INTERNAL_SERVER_ERROR,
+                'message': f'An error occurred while processing the request. {str(e)}',
+        })
+        
+        if str(otp_token.otp_code) != otp_code:
+            try:
+                otp_token = OtpToken.objects.get(user__email=user_email, otp_code=otp_code)
+            # print("Current read: ",otp_token.otp_code)
+            except OtpToken.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'status': status.HTTP_404_NOT_FOUND,
+                    'message': 'Incorrect OTP provided. Please try again.',
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            if otp_token.is_used:
+                return Response({
+                'success': False,
+                'status': status.HTTP_400_BAD_REQUEST,
+                'message': 'Already used OTP provided. Please try again.',
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+            return Response({
+                'success': False,
+                'status': status.HTTP_400_BAD_REQUEST,
+                'message': 'Previous OTP provided. Please try again.',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if the OTP token is expired
+        print(f"Current OTP Token Expiry: {otp_token.otp_expires_at}, Current Time: {timezone.now()}")
+        if otp_token.otp_expires_at < timezone.now():
+            return Response({
+                'success': False,
+                'status': status.HTTP_400_BAD_REQUEST,
+                'message': 'OTP token expired.',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Mark the OTP token as used
+        otp_token.is_used = True
+        try:
+            otp_token.save()
+        except Exception as e:
+            # Handle database integrity error
+            return Response({
+                'success': False,
+                'status': status.HTTP_500_INTERNAL_SERVER_ERROR,
+                'message': f'Error marking OTP token as used :{str(e)}',
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # update the user database update the email verified true
+        try:
+            with transaction.atomic():
+                user_update = User.objects.get(email=user_email)
+                user_update.is_email_verified=True
+                user_update.save()
+        
+        except User.DoesNotExist:
+            return Response({
+                'success': False,
+                'status': status.HTTP_404_NOT_FOUND,
+                'message': 'Email address does not exist',
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            # Handle database integrity error
+            return Response({
+                'success': False,
+                'status': status.HTTP_500_INTERNAL_SERVER_ERROR,
+                'message': f'is_email_verified update Failed :{str(e)}',
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({
+            'success': True,
+            'status': status.HTTP_200_OK,
+            'message': 'Email verification successful.',
+        }, status=status.HTTP_200_OK)
 
 # login   views here
 class UserLoginView(APIView):

@@ -6,6 +6,8 @@ from django.contrib.auth import authenticate
 from rest_framework.exceptions import AuthenticationFailed
 from django.utils import timezone
 
+class VerifyEmailSerializer(serializers.Serializer):
+    otp_code = serializers.CharField(max_length=6)
 
 # For User data pass
 class UserProfileSerializer(serializers.ModelSerializer):
