@@ -111,6 +111,7 @@ def generate_otp_code():
     return secrets.token_hex(3)
 
 class OtpToken(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="otps")
     otp_code = models.CharField(max_length=6, editable=False, default=generate_otp_code)
     otp_created_at = models.DateTimeField(auto_now_add=True)

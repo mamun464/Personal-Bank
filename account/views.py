@@ -4,12 +4,16 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
-from account.serializer import UserRegistrationSerializer, UserProfileSerializer
+from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth import login
 from .utils import generate_unique_otp,send_email
 from account.models import OtpToken
+from rest_framework.exceptions import AuthenticationFailed,ValidationError
+from drf_yasg.utils import swagger_auto_schema
+import re
+
 
 # token generator
 def get_tokens_for_user(user):
@@ -20,9 +24,70 @@ def get_tokens_for_user(user):
         'access': str(refresh.access_token),
     }
 
+# login   views here
+class UserLoginView(APIView):
+    renderer_classes = [UserRenderer]
+
+    @swagger_auto_schema(request_body=UserLoginSerializer)
+    def post(self, request, format=None):
+        serializer = UserLoginSerializer(data=request.data)
+
+        required_fields = ['email', 'password']
+        for field in required_fields:
+            if field not in request.data or not request.data[field]:
+                return Response({
+                    'success': False,
+                    'status': status.HTTP_400_BAD_REQUEST,
+                    'message': f'{field} is missing or empty',
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            validated_data = serializer.validate(request.data)
+            user = validated_data['user']
+            
+            # TODO: Implement wallet feature
+            # if not Wallet.objects.filter(user=user).exists():
+            #     Wallet.objects.create(user=user)
+            
+
+            user.last_login = timezone.now()
+            user.save()
+            login(request, user)
+            token = get_tokens_for_user(user)
+
+            user_serializer = UserProfileSerializer(user)
+            user_data = user_serializer.data
+
+            return Response({
+                'success': True,
+                'status': status.HTTP_200_OK,
+                'message': 'Successfully logged in',
+                'token': token,
+                'user_data': user_data,
+            }, status=status.HTTP_200_OK)
+
+        except (AuthenticationFailed, ValidationError) as e:
+            status_code = status.HTTP_401_UNAUTHORIZED if isinstance(e, AuthenticationFailed) else status.HTTP_400_BAD_REQUEST
+            return Response({
+                'success': False,
+                'status': status_code,
+                'message': str(e),  # Use the error message from the exception
+            }, status=status_code)
+
+        except Exception as e:
+            error_messages = []
+            for field, messages in e.detail.items():
+                error_messages.append(f"{field}: {messages[0]}")
+            return Response({
+                'success': False,
+                'status': status.HTTP_400_BAD_REQUEST,
+                'message': "\n".join(error_messages),
+            }, status=status.HTTP_400_BAD_REQUEST)
+
 
 class UserRegistrationView(APIView):
     renderer_classes = [UserRenderer]
+    @swagger_auto_schema(request_body=UserRegistrationSerializer)
     def post(self,request,format=None):
 
         serializer = UserRegistrationSerializer(data=request.data)
@@ -38,13 +103,27 @@ class UserRegistrationView(APIView):
             
 
 
-        
+        phone_no = request.data.get('phone_no', '')
+
+        # Define a regex pattern to allow only numbers and an optional leading '+'
+        phone_no_pattern = r'^\+?[0-9]+$'
+
+        if not re.match(phone_no_pattern, phone_no):
+            return Response({
+                'success': False,
+                'status': status.HTTP_400_BAD_REQUEST,
+                'message': 'Invalid phone number. Only numbers are allowed, with an optional leading (+)',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+    
         
 
         try:
             if serializer.is_valid():
                 with transaction.atomic():
                     new_user = serializer.save()
+                    # TODO: Implement wallet feature
+                    
                     # Immediately create the wallet for the new user
                     # user_wallet = Wallet.objects.create(user=new_user)
                     # user_wallet.balance_threshold_pct = 20
@@ -69,7 +148,7 @@ class UserRegistrationView(APIView):
                         'email_sent': False,
                         'error': f'OTP create Failed: {str(e)}',
                         'token': token,
-                        'user': user_data,
+                        'user_data': user_data,
                         
                         },status=status.HTTP_200_OK)
                 #Send the Mail OTP verification
@@ -90,7 +169,7 @@ class UserRegistrationView(APIView):
                     'message': 'Registration successful & OTP sent to email address',
                     'email_sent': True,
                     'token': token,
-                    'user': user_data,
+                    'user_data': user_data,
                     
                     },status=status.HTTP_200_OK)
                 else:
@@ -99,7 +178,7 @@ class UserRegistrationView(APIView):
                         'status': status.HTTP_200_OK,
                         'message': 'Registration successful & OTP sending failed to email address',
                         'email_sent': True,
-                        'user': user_data,
+                        'user_data': user_data,
                         'token': token,
                         
                     }, status=status.HTTP_200_OK)

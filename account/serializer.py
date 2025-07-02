@@ -2,6 +2,9 @@
 from rest_framework import serializers
 from account.models import User
 from django import forms
+from django.contrib.auth import authenticate
+from rest_framework.exceptions import AuthenticationFailed
+from django.utils import timezone
 
 
 # For User data pass
@@ -10,6 +13,31 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         exclude = ['password']
 
+class UserLoginSerializer(serializers.ModelSerializer):
+        email = serializers.CharField(max_length=20)
+        class Meta:
+            model = User
+            fields = ['email', 'password',]
+
+        def validate(self, data):
+            email = data.get('email')
+            password = data.get('password')
+
+            user = authenticate(email=email, password=password)
+            
+            if user is not None:
+                if not user.is_active:
+                    raise AuthenticationFailed('Account disabled, contact with Administrator')
+
+                # Update last_login time for the user
+                user.last_login = timezone.now()
+                user.save()
+
+                # Return both the authenticated user and validated data
+                return {'user': user, 'data': data}
+            else:
+                raise AuthenticationFailed(f'Invalid credentials, Please try again with correct credentials')
+            
 class UserRegistrationSerializer(serializers.ModelSerializer):
     
     confirm_password = serializers.CharField(style={'input_type': 'password'}, write_only=True)

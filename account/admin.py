@@ -1,7 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
-from .models import User
+from .models import User,OtpToken
+
 
 
 class UserAdmin(BaseUserAdmin):
@@ -31,3 +32,11 @@ class UserAdmin(BaseUserAdmin):
 
 
 admin.site.register(User, UserAdmin)
+
+class OtpTokenAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'otp_code', 'otp_created_at', 'otp_expires_at', 'max_otp_try', 'max_otp_try_expires', 'is_used')
+    search_fields = ('user__email', 'otp_code')
+    list_filter = ('is_used', 'otp_created_at', 'otp_expires_at')
+    readonly_fields = ('otp_code', 'otp_created_at', 'otp_expires_at', 'max_otp_try_expires')
+
+admin.site.register(OtpToken, OtpTokenAdmin)
