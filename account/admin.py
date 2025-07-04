@@ -8,9 +8,11 @@ from .models import User,OtpToken
 class UserAdmin(BaseUserAdmin):
     ordering = ['email']
     list_display = [
-    'id', 'email', 'name', 'phone_no', 'date_of_birth', 'user_profile_img', 
-    'role', 'is_active', 'is_staff', 'is_superuser', 'created_at', 'updated_at'
+    'id', 'email', 'name', 'phone_no', 'date_of_birth', 'is_verified',
+    'user_profile_img', 'role', 'is_active', 'is_staff', 'is_superuser',
+    'last_login', 'created_at', 'updated_at'
     ]
+
 
     list_filter = ['role', 'is_active', 'is_staff', 'is_superuser']
 

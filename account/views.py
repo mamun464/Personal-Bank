@@ -26,6 +26,133 @@ def get_tokens_for_user(user):
         'access': str(refresh.access_token),
     }
 
+class CheckEmailVerifiedView(APIView):
+    permission_classes = [IsAuthenticated]
+    renderer_classes = [UserRenderer]
+    def get(self, request):
+
+        user = request.user
+        if user.is_verified:
+            return Response({
+                'success': True,
+                'verified': True,
+                'status': status.HTTP_200_OK,
+                'message': 'Email address is verified',
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'success': True,
+                'verified': False,
+                'status': status.HTTP_200_OK,
+                'message': 'Email address is not verified',
+            }, status=status.HTTP_200_OK)
+
+class ResendOtpView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    renderer_classes = [UserRenderer]
+    def post(self, request):
+
+        user = request.user
+
+        try:
+            # # Mark all OTPs for this user as used
+            OtpToken.objects.filter(user=user, is_used=False).update(is_used=True)
+            
+        except User.DoesNotExist:
+            return Response({
+                'success': False,
+                'status': status.HTTP_404_NOT_FOUND,
+                'message': 'Email address does not exist',
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+                # Handle database integrity error
+            return Response({
+                'success': False,
+                'status': status.HTTP_500_INTERNAL_SERVER_ERROR,
+                'message': f"Email verification Code resend Failed: {str(e)}",
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            
+        otp = OtpToken.objects.filter(user=user).last()
+        if not otp:
+            try:
+                otp=OtpToken.objects.create(user=user,otp_code=generate_unique_otp(), otp_expires_at=timezone.now() + timezone.timedelta(hours=1))
+            except Exception as e:
+                return Response({
+                'success': False,
+                'status':status.HTTP_500_INTERNAL_SERVER_ERROR,
+                'message': f'OTP create Failed',
+                'error': f'OTP create Failed: {str(e)}',
+                
+                },status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            msg=f"BrandNew: {otp.otp_code}"
+        else:
+            # otp=OtpToken.objects.create(user=user,otp_code=generate_unique_otp(), otp_expires_at=timezone.now() + timezone.timedelta(hours=1))
+            # msg="Exist otp token found"
+            # msg=otp.otp_code
+            previous_max_otp_try=otp.max_otp_try
+            previous_max_otp_try_expires = otp.max_otp_try_expires
+
+            current_max_otp_try=None
+            current_max_otp_try_expires = None
+            
+            if previous_max_otp_try <= 0 and previous_max_otp_try_expires > timezone.now():
+                # Calculate remaining time
+                remaining_time = previous_max_otp_try_expires - timezone.now()
+                remaining_minutes = remaining_time.total_seconds() // 60  # Convert remaining time to minutes
+                return Response({
+                    'success': False,
+                    'status': status.HTTP_400_BAD_REQUEST,
+                    'message': f'Max Limit crossed for OTP sent. Please try again after {remaining_minutes} minutes.',
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+            elif previous_max_otp_try <= 0 and previous_max_otp_try_expires < timezone.now():
+                current_max_otp_try = 3
+                current_max_otp_try_expires = None
+
+            else:
+                current_max_otp_try = previous_max_otp_try-1
+
+            if current_max_otp_try == 0:
+                current_max_otp_try_expires= timezone.now() + timezone.timedelta(hours=1)
+            
+            otp=OtpToken.objects.create(
+                user=user,
+                otp_code=generate_unique_otp(),
+                otp_expires_at=timezone.now() + timezone.timedelta(hours=1),
+                max_otp_try= current_max_otp_try,
+                max_otp_try_expires=current_max_otp_try_expires,
+                )
+            
+            msg=f"Renew: {otp.otp_code}"
+
+        bodyContent = f"Here is your OTP: {otp.otp_code}"
+        data={
+            'subject': 'Email Verification Code',
+            'body': bodyContent,
+            'to_email': otp.user.email,
+
+        }
+        
+        email_sent=send_email(data)
+
+
+        if email_sent:
+            return Response({
+                'success': True,
+                'status': status.HTTP_200_OK,
+                'message': 'OTP successfully sent to registered email',
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'success': False,
+                'status': status.HTTP_400_BAD_REQUEST,
+                'message': 'Failed to send OTP by email',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
 class VerifyEmailView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -118,7 +245,7 @@ class VerifyEmailView(APIView):
         try:
             with transaction.atomic():
                 user_update = User.objects.get(email=user_email)
-                user_update.is_email_verified=True
+                user_update.is_verified=True
                 user_update.save()
         
         except User.DoesNotExist:
@@ -133,7 +260,7 @@ class VerifyEmailView(APIView):
             return Response({
                 'success': False,
                 'status': status.HTTP_500_INTERNAL_SERVER_ERROR,
-                'message': f'is_email_verified update Failed :{str(e)}',
+                'message': f'Error marking OTP as used :{str(e)}',
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({
