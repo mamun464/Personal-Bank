@@ -71,7 +71,7 @@ class User(AbstractBaseUser,PermissionsMixin):
     is_active = models.BooleanField(default=True) # must needed, otherwise you won't be able to loginto django-admin.
     is_superuser = models.BooleanField(default=False) # this field we inherit from PermissionsMixin.
 
-    created_at = models.DateTimeField(auto_now=True,editable=False)
+    created_at = models.DateTimeField(auto_now_add=True,editable=False)
     updated_at = models.DateTimeField(null=True, blank=True)  # Set only on updates
 
     

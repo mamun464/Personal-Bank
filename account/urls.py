@@ -9,5 +9,6 @@ urlpatterns = [
     path("check-email-verified/", CheckEmailVerifiedView.as_view(), name="check-email-verified"),
 
     path('send-reset-link/', SendPasswordResetEmailView.as_view(),name='send-reset-link'),
+    path('rest-password/<uid>/<token>/', UserPasswordResetView.as_view(),name='rest-password'),
     
 ]

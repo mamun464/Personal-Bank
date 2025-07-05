@@ -13,6 +13,7 @@ class UserAdmin(BaseUserAdmin):
     'last_login', 'created_at', 'updated_at'
     ]
 
+    readonly_fields = ['last_login', 'created_at', 'updated_at']
 
     list_filter = ['role', 'is_active', 'is_staff', 'is_superuser']
 

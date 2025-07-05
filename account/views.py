@@ -1,10 +1,10 @@
 from django.shortcuts import render
 from account.renderers import UserRenderer
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status,serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
-from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer,VerifyEmailSerializer,SendPasswordResetEmailSerializer
+from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer,VerifyEmailSerializer,SendPasswordResetEmailSerializer,UserPasswordRestSerializer
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth import login
@@ -26,6 +26,45 @@ def get_tokens_for_user(user):
         'access': str(refresh.access_token),
     }
 
+class UserPasswordResetView(APIView):
+    renderer_classes = [UserRenderer]
+    @swagger_auto_schema(request_body=UserPasswordRestSerializer)
+    def post(self, request, uid, token, format=None):
+
+        required_fields = [ 'password', 'confirm_password']
+        for field in required_fields:
+            if field not in request.data or not request.data[field]:
+                return Response({
+                    'success': False,
+                    'status': status.HTTP_400_BAD_REQUEST,
+                    'message': f'{field} is missing or empty in body',
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = UserPasswordRestSerializer(data=request.data, context={'uid': uid, 'token': token})
+        try:
+            serializer.is_valid(raise_exception=True)
+            return Response({
+                'success': True,
+                'status': status.HTTP_200_OK,
+                'message': 'Password Reset successfully'
+            }, status=status.HTTP_200_OK)
+        except serializers.ValidationError as e:
+            error_messages = []
+            for messages in e.detail.values():
+                error_messages.extend(messages)
+            message = " ".join(error_messages) if error_messages else "Invalid data provided."
+            return Response({
+                'success': False,
+                'status': status.HTTP_400_BAD_REQUEST,
+                'message': message
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({
+                'success': False,
+                'status': status.HTTP_500_INTERNAL_SERVER_ERROR,
+                'message': f"An unexpected error occurred: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class SendPasswordResetEmailView(APIView):
     renderer_classes = [UserRenderer]
     @swagger_auto_schema(request_body=SendPasswordResetEmailSerializer)
@@ -36,7 +75,7 @@ class SendPasswordResetEmailView(APIView):
                 return Response({
                     'success': False,
                     'status': status.HTTP_400_BAD_REQUEST,
-                    'message': f'{field} is missing or empty',
+                    'message': f'{field} is missing or empty in body',
                 }, status=status.HTTP_400_BAD_REQUEST)
             
         serializer = SendPasswordResetEmailSerializer(data=request.data)
@@ -207,7 +246,7 @@ class VerifyEmailView(APIView):
                 return Response({
                     'success': False,
                     'status': status.HTTP_400_BAD_REQUEST,
-                    'message': f'{field} is missing or empty',
+                    'message': f'{field} is missing or empty in body',
                 }, status=status.HTTP_400_BAD_REQUEST)
 
         otp_code = request.data.get('otp_code')
@@ -323,7 +362,7 @@ class UserLoginView(APIView):
                 return Response({
                     'success': False,
                     'status': status.HTTP_400_BAD_REQUEST,
-                    'message': f'{field} is missing or empty',
+                    'message': f'{field} is missing or empty in body',
                 }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -383,7 +422,7 @@ class UserRegistrationView(APIView):
                 return Response({
                     'success': False,
                     'status': status.HTTP_400_BAD_REQUEST,
-                    'message': f'{field} is missing or empty',
+                    'message': f'{field} is missing or empty in body',
                 }, status=status.HTTP_400_BAD_REQUEST)
             
 

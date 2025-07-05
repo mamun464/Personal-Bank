@@ -12,7 +12,40 @@ from decouple import config
 from django.core.exceptions import ValidationError
 from .utils import send_email
 
-base_url = config('FRONTEND_BASE_URL')
+FRONTEND_BASE_URL = config('FRONTEND_BASE_URL')
+
+class UserPasswordRestSerializer(serializers.Serializer):
+    password = serializers.CharField(style={'input_type': 'password'}, write_only=True)
+    confirm_password = serializers.CharField(style={'input_type': 'password'}, write_only=True)
+
+    class Meta:
+        fields = ['password', 'confirm_password']
+
+    def validate(self, attrs):
+        password = attrs.get('password')
+        confirm_password = attrs.get('confirm_password')
+        uid = self.context.get('uid')
+        token = self.context.get('token')
+
+        if password != confirm_password:
+            raise serializers.ValidationError("Confirm password does not match password.")
+
+        try:
+            user_id = smart_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(id=user_id)
+
+            if not PasswordResetTokenGenerator().check_token(user, token):
+                raise ValidationError("Token is not valid or expired")
+
+            user.set_password(password)
+            user.save()
+            return attrs
+
+        except DjangoUnicodeDecodeError:
+            raise ValidationError("Token is not valid or expired")
+
+        except User.DoesNotExist:
+            raise ValidationError("User does not exist.")
 
 class SendPasswordResetEmailSerializer(serializers.Serializer): 
     email = serializers.EmailField(max_length=254)
@@ -27,9 +60,7 @@ class SendPasswordResetEmailSerializer(serializers.Serializer):
             EncodedUserId = urlsafe_base64_encode(force_bytes(user.id))
             print(EncodedUserId)
             token = PasswordResetTokenGenerator().make_token(user)
-            print('Password ResetToken:',token)
-            PassResetLink = f'{base_url}/api/user/rest-password/'+EncodedUserId+'/'+token+'/'
-            print('PassResetLink:',PassResetLink)
+            PassResetLink = f'{FRONTEND_BASE_URL}/reset-password/{EncodedUserId}/{token}/'
 
             #Email Send Code
             bodyContent = 'Click here to RESET YOUR PASSWORD: '+PassResetLink
