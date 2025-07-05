@@ -5,7 +5,48 @@ from django import forms
 from django.contrib.auth import authenticate
 from rest_framework.exceptions import AuthenticationFailed
 from django.utils import timezone
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.encoding import smart_str,force_bytes,DjangoUnicodeDecodeError
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from decouple import config
+from django.core.exceptions import ValidationError
+from .utils import send_email
 
+base_url = config('FRONTEND_BASE_URL')
+
+class SendPasswordResetEmailSerializer(serializers.Serializer): 
+    email = serializers.EmailField(max_length=254)
+
+    class Meta:
+            fields = ['email']
+
+    def validate(self, attrs):
+        email = attrs.get('email')
+        if User.objects.filter(email=email).exists():
+            user= User.objects.get(email=email)
+            EncodedUserId = urlsafe_base64_encode(force_bytes(user.id))
+            print(EncodedUserId)
+            token = PasswordResetTokenGenerator().make_token(user)
+            print('Password ResetToken:',token)
+            PassResetLink = f'{base_url}/api/user/rest-password/'+EncodedUserId+'/'+token+'/'
+            print('PassResetLink:',PassResetLink)
+
+            #Email Send Code
+            bodyContent = 'Click here to RESET YOUR PASSWORD: '+PassResetLink
+            data={
+                'subject': 'Reset Your Password',
+                'body': bodyContent,
+                'to_email': user.email
+
+            }
+            email_sent=send_email(data)
+            if not email_sent:
+                raise ValidationError("Failed to send password reset email. Please try again later.")
+            
+            return attrs
+        else:
+            raise ValidationError("Email not registered in central Database!")
+        
 class VerifyEmailSerializer(serializers.Serializer):
     otp_code = serializers.CharField(max_length=6)
 

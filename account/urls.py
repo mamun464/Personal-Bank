@@ -7,5 +7,7 @@ urlpatterns = [
     path("verify-email/", VerifyEmailView.as_view(), name="verify-email"),
     path("resend-otp/", ResendOtpView.as_view(), name="resend-otp"),
     path("check-email-verified/", CheckEmailVerifiedView.as_view(), name="check-email-verified"),
+
+    path('send-reset-link/', SendPasswordResetEmailView.as_view(),name='send-reset-link'),
     
 ]

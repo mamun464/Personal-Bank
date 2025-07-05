@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
-from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer,VerifyEmailSerializer
+from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer,VerifyEmailSerializer,SendPasswordResetEmailSerializer
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth import login
@@ -25,6 +25,46 @@ def get_tokens_for_user(user):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
+
+class SendPasswordResetEmailView(APIView):
+    renderer_classes = [UserRenderer]
+    @swagger_auto_schema(request_body=SendPasswordResetEmailSerializer)
+    def post(self, request, format=None):
+        required_fields = [ 'email']
+        for field in required_fields:
+            if field not in request.data or not request.data[field]:
+                return Response({
+                    'success': False,
+                    'status': status.HTTP_400_BAD_REQUEST,
+                    'message': f'{field} is missing or empty',
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+        serializer = SendPasswordResetEmailSerializer(data=request.data)
+        
+        try:
+            serializer.is_valid(raise_exception=True)
+        except Exception as e:
+            error_messages = []
+            if hasattr(e, 'detail') and isinstance(e.detail, dict):
+                for messages in e.detail.values():
+                    if isinstance(messages, list):
+                        error_messages.extend([str(msg) for msg in messages])
+                    else:
+                        error_messages.append(str(messages))
+            else:
+                error_messages.append(str(e))    # fallback if e.detail doesn't exist
+
+            return Response({
+                'success': False,
+                'status': status.HTTP_400_BAD_REQUEST,
+                'message': "Failed to send password reset link: " + ", ".join(error_messages),
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            'success': True,
+            'status': status.HTTP_200_OK,
+            'message': 'Password reset link sent to your registered email. Please check your inbox.'
+        }, status=status.HTTP_200_OK)
 
 class CheckEmailVerifiedView(APIView):
     permission_classes = [IsAuthenticated]
