@@ -14,6 +14,11 @@ from .utils import send_email
 
 FRONTEND_BASE_URL = config('FRONTEND_BASE_URL')
 
+class UserActiveStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['is_active']
+
 class UserPasswordRestSerializer(serializers.Serializer):
     password = serializers.CharField(style={'input_type': 'password'}, write_only=True)
     confirm_password = serializers.CharField(style={'input_type': 'password'}, write_only=True)

@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status,serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
-from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer,VerifyEmailSerializer,SendPasswordResetEmailSerializer,UserPasswordRestSerializer
+from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer,VerifyEmailSerializer,SendPasswordResetEmailSerializer,UserPasswordRestSerializer,UserActiveStatusSerializer
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth import login
@@ -15,6 +15,8 @@ from drf_yasg.utils import swagger_auto_schema
 import re
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
+from account.permissions import CanChangeActiveStatus
+from drf_yasg import openapi
 
 
 # token generator
@@ -25,6 +27,73 @@ def get_tokens_for_user(user):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
+
+
+class ChangeUserActiveStatusView(APIView):
+    permission_classes = [IsAuthenticated, CanChangeActiveStatus]
+
+    @swagger_auto_schema(
+        operation_description="Change the 'is_active' status of a user using query param 'user_id'",
+        manual_parameters=[
+            openapi.Parameter(
+                'user_id',
+                openapi.IN_QUERY,
+                description="UUID of the user",
+                type=openapi.TYPE_STRING,
+                required=True
+            )
+        ],
+        request_body=UserActiveStatusSerializer,
+        responses={
+            200: openapi.Response(description="Success", schema=UserActiveStatusSerializer),
+            400: "Invalid data or missing user_id",
+            404: "User not found"
+        }
+    )
+    def patch(self, request):
+        required_fields = ['user_id']
+        for field in required_fields:
+            if field not in request.query_params or not request.query_params[field]:
+                return Response({
+                    'success': False,
+                    'status': status.HTTP_400_BAD_REQUEST,
+                    'message': f'{field} is missing or empty in the params',
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        user_id = request.query_params.get('user_id')
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({
+                "success": False,
+                "status": status.HTTP_404_NOT_FOUND,
+                "message": "User not found."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = UserActiveStatusSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            new_status = serializer.validated_data['is_active']
+            if user.is_active == new_status:
+                return Response({
+                    "success": False,
+                    "status": status.HTTP_400_BAD_REQUEST,
+                    "message": f"User is already {'active' if new_status else 'inactive'}."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            serializer.save()
+            return Response({
+                "success": True,
+                "status": status.HTTP_200_OK,
+                "message": f"User has been {'activated' if new_status else 'deactivated'} successfully."
+            }, status=status.HTTP_200_OK)
+
+        return Response({
+            "success": False,
+            "status": status.HTTP_400_BAD_REQUEST,
+            "message": "Invalid data.",
+            "errors": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 class UserPasswordResetView(APIView):
     renderer_classes = [UserRenderer]

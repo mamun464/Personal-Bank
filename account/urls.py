@@ -10,5 +10,7 @@ urlpatterns = [
 
     path('send-reset-link/', SendPasswordResetEmailView.as_view(),name='send-reset-link'),
     path('rest-password/<uid>/<token>/', UserPasswordResetView.as_view(),name='rest-password'),
+
+    path('change-active-status/', ChangeUserActiveStatusView.as_view(), name='change-active-status'),
     
 ]
