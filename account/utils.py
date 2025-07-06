@@ -1,6 +1,25 @@
 from django.utils import timezone
 import secrets
 from .models import OtpToken
+from rest_framework.exceptions import ValidationError
+
+@staticmethod
+def flattened_serializer_errors(serializer):
+    """
+    Collect all serializer error messages, join them into a single string,
+    and raise a ValidationError with the combined message.
+    """
+    all_errors = []
+    for field_errors in serializer.errors.values():
+        if isinstance(field_errors, list):
+            all_errors.extend(field_errors)
+        else:
+            all_errors.append(str(field_errors))
+    
+    # Join all messages into a single string separated by " | "
+    error_message = " | ".join(all_errors)
+    return error_message
+
 
 def generate_unique_otp():
     """

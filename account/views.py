@@ -4,11 +4,11 @@ from rest_framework.response import Response
 from rest_framework import status,serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
-from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer,VerifyEmailSerializer,SendPasswordResetEmailSerializer,UserPasswordRestSerializer,UserActiveStatusSerializer
+from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer,VerifyEmailSerializer,SendPasswordResetEmailSerializer,UserPasswordRestSerializer,UserActiveStatusSerializer,UserProfileUpdateSerializer
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth import login
-from .utils import generate_unique_otp,send_email
+from .utils import generate_unique_otp,send_email,flattened_serializer_errors
 from account.models import OtpToken,User
 from rest_framework.exceptions import AuthenticationFailed,ValidationError
 from drf_yasg.utils import swagger_auto_schema
@@ -27,6 +27,30 @@ def get_tokens_for_user(user):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
+
+class UpdateOwnProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(request_body=UserProfileUpdateSerializer)
+    def patch(self, request):
+        user = request.user
+        serializer = UserProfileUpdateSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "success": True,
+                "status": status.HTTP_200_OK,
+                "message": "Profile updated successfully",
+                "user_data": UserProfileSerializer(user).data
+            }, status=status.HTTP_200_OK)
+
+
+        return Response({
+            "success": False,
+            "status": status.HTTP_400_BAD_REQUEST,
+            "message": flattened_serializer_errors(serializer)
+        }, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class ChangeUserActiveStatusView(APIView):
@@ -91,8 +115,7 @@ class ChangeUserActiveStatusView(APIView):
         return Response({
             "success": False,
             "status": status.HTTP_400_BAD_REQUEST,
-            "message": "Invalid data.",
-            "errors": serializer.errors
+            "message": flattened_serializer_errors(serializer)
         }, status=status.HTTP_400_BAD_REQUEST)
 
 class UserPasswordResetView(APIView):

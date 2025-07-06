@@ -14,6 +14,17 @@ from .utils import send_email
 
 FRONTEND_BASE_URL = config('FRONTEND_BASE_URL')
 
+class UserProfileUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['name', 'phone_no', 'date_of_birth']
+        extra_kwargs = {
+            'phone_no': {'required': False},
+            'name': {'required': False},
+            'date_of_birth': {'required': False},
+            'user_profile_img': {'required': False},
+        }
+
 class UserActiveStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = User

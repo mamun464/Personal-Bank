@@ -12,5 +12,6 @@ urlpatterns = [
     path('rest-password/<uid>/<token>/', UserPasswordResetView.as_view(),name='rest-password'),
 
     path('change-active-status/', ChangeUserActiveStatusView.as_view(), name='change-active-status'),
+    path('update-profile/', UpdateOwnProfileView.as_view(), name='update-own-profile'),
     
 ]
