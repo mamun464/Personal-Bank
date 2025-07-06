@@ -17,6 +17,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from account.permissions import CanChangeActiveStatus
 from drf_yasg import openapi
+import uuid
 
 
 # token generator
@@ -27,6 +28,57 @@ def get_tokens_for_user(user):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
+
+class UserProfileDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Get user profile details. Admins can pass `user_id` to view others. Customers can only view their own.",
+        manual_parameters=[
+            openapi.Parameter(
+                'user_id',
+                openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="Optional - UUID of the user (admin only)",
+                required=False
+            )
+        ],
+        responses={200: UserProfileSerializer}
+    )
+    def get(self, request):
+        user_id = request.query_params.get('user_id')
+
+        if request.user.role == 'customer':
+            # Customers can only view their own profile
+            target_user = request.user
+        elif request.user.role in ['admin', 'employee']:
+            # Admins can view their own or others
+            if user_id:
+                try:
+                    valid_uuid = uuid.UUID(user_id.strip())  # Strip extra whitespace and validate
+                    target_user = User.objects.get(id=valid_uuid)
+                except (ValueError, User.DoesNotExist):
+                    return Response({
+                        "success": False,
+                        "status": 400,
+                        "message": "Invalid or non-existent user_id"
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                target_user = request.user
+        else:
+            return Response({
+                "success": False,
+                "status": 403,
+                "message": "You are not authorized to access this resource."
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = UserProfileSerializer(target_user)
+        return Response({
+            "success": True,
+            "status": 200,
+            "message": "User profile fetched successfully.",
+            "user_data": serializer.data
+        }, status=status.HTTP_200_OK)
 
 class UpdateOwnProfileView(APIView):
     permission_classes = [IsAuthenticated]
@@ -87,13 +139,14 @@ class ChangeUserActiveStatusView(APIView):
         user_id = request.query_params.get('user_id')
 
         try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
+                valid_uuid = uuid.UUID(user_id.strip())  # Strip extra whitespace and validate
+                user = User.objects.get(id=valid_uuid)
+        except (ValueError, User.DoesNotExist):
             return Response({
                 "success": False,
-                "status": status.HTTP_404_NOT_FOUND,
-                "message": "User not found."
-            }, status=status.HTTP_404_NOT_FOUND)
+                "status": 400,
+                "message": "Invalid or non-existent user id"
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = UserActiveStatusSerializer(user, data=request.data, partial=True)
         if serializer.is_valid():
