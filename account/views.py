@@ -15,9 +15,10 @@ from drf_yasg.utils import swagger_auto_schema
 import re
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
-from account.permissions import CanChangeActiveStatus
+from account.permissions import CanChangeActiveStatus,is_authorized_role
 from drf_yasg import openapi
 import uuid
+from user_wallet.models import Wallet
 
 
 # token generator
@@ -51,7 +52,7 @@ class UserProfileDetailView(APIView):
         if request.user.role == 'customer':
             # Customers can only view their own profile
             target_user = request.user
-        elif request.user.role in ['admin', 'employee']:
+        elif is_authorized_role(request.user):
             # Admins can view their own or others
             if user_id:
                 try:
@@ -514,9 +515,9 @@ class UserLoginView(APIView):
             validated_data = serializer.validate(request.data)
             user = validated_data['user']
             
-            # TODO: Implement wallet feature
-            # if not Wallet.objects.filter(user=user).exists():
-            #     Wallet.objects.create(user=user)
+            #Implement wallet feature
+            if not Wallet.objects.filter(user=user).exists():
+                Wallet.objects.create(user=user)
             
 
             user.last_login = timezone.now()
@@ -591,12 +592,10 @@ class UserRegistrationView(APIView):
             if serializer.is_valid():
                 with transaction.atomic():
                     new_user = serializer.save()
-                    # TODO: Implement wallet feature
                     
                     # Immediately create the wallet for the new user
-                    # user_wallet = Wallet.objects.create(user=new_user)
-                    # user_wallet.balance_threshold_pct = 20
-                    # user_wallet.save()
+                    user_wallet = Wallet.objects.create(user=new_user)
+
                     token=get_tokens_for_user(new_user)
                     
 

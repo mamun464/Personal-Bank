@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'drf_yasg',
     'personal_bank',
     'account',
+    'user_wallet',
 ]
 
 AUTH_USER_MODEL = 'account.User'

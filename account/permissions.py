@@ -20,3 +20,9 @@ class CanChangeActiveStatus(BasePermission):
             raise PermissionDenied("Managers are not allowed to change their own active status.")
 
         return True
+    
+authorized_role=['admin', 'employee', 'CEO']
+@staticmethod
+def is_authorized_role(user):
+    return user and user.role in ['admin', 'employee', 'CEO']
+

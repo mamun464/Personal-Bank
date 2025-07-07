@@ -65,7 +65,7 @@ class User(AbstractBaseUser,PermissionsMixin):
 
     # Non mandatory Fields
     user_profile_img = models.URLField(blank=True,null=True)
-    role = models.CharField(max_length=20, choices=[('customer', 'Customer'), ('admin', 'Admin'), ('employee', 'Employee')], default='customer')
+    role = models.CharField(max_length=20, choices=[('customer', 'Customer'), ('admin', 'Admin'),('CEO', 'CEO'),('employee', 'Employee')], default='customer')
 
     is_staff = models.BooleanField(default=False) # must needed, otherwise you won't be able to loginto django-admin.
     is_active = models.BooleanField(default=True) # must needed, otherwise you won't be able to loginto django-admin.
