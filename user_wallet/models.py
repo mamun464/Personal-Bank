@@ -7,7 +7,7 @@ from django.db.models.signals import pre_save
 from django.dispatch import receiver
 import random
 import string
-from account.permissions import authorized_role
+from account.permissions import AUTHORIZED_ROLES
 
 class Wallet(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -49,10 +49,10 @@ class WalletTransaction(models.Model):
     ]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     transaction_id = models.CharField( max_length=15,unique=True,editable=False)
-    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="transactions_User")
+    customer = models.ForeignKey(User, on_delete=models.PROTECT, related_name="transactions_User")
     date_of_transaction = models.DateField(null=False, blank=False,default=now)
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPE_CHOICES)
-    payment_method = models.CharField(max_length=50, choices=PAYMENT_METHOD_CHOICES, blank=True, null=True)
+    payment_method = models.CharField(max_length=50, choices=PAYMENT_METHOD_CHOICES)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     document_photo_url = models.URLField(max_length=1024, null=True, blank=True)  # Allow null/blank
     receipt_reference_no = models.CharField(unique=True, max_length=255, null=True, blank=True)  # Allow null/blank
@@ -67,9 +67,12 @@ class WalletTransaction(models.Model):
         Override the save method to always call clean before saving.
         """
         self.clean()  # Call the clean method to perform validation
-        if self.pk:  # Only set updated_at if the instance already exists
-            self.updated_at = now()
+        if self.pk is not None:
+            # Check if this is an update (object exists in DB)
+            if WalletTransaction.objects.filter(pk=self.pk).exists():
+                self.updated_at = now()
         super(WalletTransaction, self).save(*args, **kwargs)
+        
 
     def clean(self):
         """
@@ -80,11 +83,11 @@ class WalletTransaction(models.Model):
         if self.transaction_type in ['deposit'] and self.payment_method == 'bank_transfer' and not self.document_photo_url:
             raise ValidationError({'document_photo_url': 'This field is required for this Transaction Type.'})
         
-        if self.processed_by and self.processed_by.role not in authorized_role:
+        if self.processed_by and self.processed_by.role not in AUTHORIZED_ROLES:
             raise ValidationError("Only admin, employee, or CEO can be assigned as 'processed_by'")
 
     def __str__(self):
-        return f"({self.user.name}) - {self.transaction_type} - {self.amount}"
+        return f"({self.customer.name}) - {self.transaction_type} - {self.amount}"
 
 
 @receiver(pre_save, sender=WalletTransaction)

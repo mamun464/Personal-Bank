@@ -9,12 +9,12 @@ class WalletAdmin(admin.ModelAdmin):
 
 class WalletTransactionAdmin(admin.ModelAdmin):
     list_display = (
-        'transaction_id', 'user', 'date_of_transaction', 'transaction_type', 
+        'transaction_id', 'customer', 'date_of_transaction', 'transaction_type', 
         'payment_method', 'amount', 'processed_by', 'created_at', 'updated_at'
     )
     list_filter = ('transaction_type', 'payment_method', 'date_of_transaction', 'created_at')
     search_fields = (
-        'transaction_id', 'user__name', 'user__email', 'receipt_reference_no', 'processed_by__name'
+        'transaction_id', 'customer__name', 'customer__email', 'receipt_reference_no', 'processed_by__name'
     )
     readonly_fields = ('transaction_id', 'created_at', 'updated_at')
     ordering = ('-date_of_transaction', '-created_at')
@@ -22,7 +22,7 @@ class WalletTransactionAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {
             'fields': (
-                'transaction_id', 'user', 'date_of_transaction', 'transaction_type', 'payment_method', 
+                'transaction_id', 'customer', 'date_of_transaction', 'transaction_type', 'payment_method', 
                 'amount', 'document_photo_url', 'receipt_reference_no', 'processed_by'
             )
         }),
