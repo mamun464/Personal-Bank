@@ -7,17 +7,85 @@ from rest_framework.permissions import IsAuthenticated
 from account.renderers import UserRenderer,UserRendererWithDecimal
 from django.db import transaction
 from user_wallet.models import Wallet,WalletTransaction
-from user_wallet.serializer import WalletTransactionSerializer
-from account.permissions import IsAuthorizedUser,IsNotCustomerSelf,IsCustomerRoleOnly
+from user_wallet.serializer import WalletTransactionSerializer,WalletTransactionListSerializer
+from account.permissions import IsAuthorizedUser,IsNotCustomerSelf,TargetUserMustBeCustomer,AUTHORIZED_ROLES
 from decimal import Decimal
 import logging
+from rest_framework.pagination import PageNumberPagination
+
 
 logger = logging.getLogger(__name__)
 
 
+class TransactionListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    renderer_classes = [UserRenderer]
+
+    def get(self, request):
+        user = request.user
+        try:
+            # ✅ Admins, employees, ceo can view all transactions
+            if user.role in AUTHORIZED_ROLES:
+                queryset = WalletTransaction.objects.all().order_by('-created_at')
+            else:
+                # ✅ Customers can only see their own transactions
+                queryset = WalletTransaction.objects.filter(customer=user).order_by('-created_at')
+                
+            # ✅ Dynamic filters
+            customer = request.GET.get("customer")
+            date_of_transaction = request.GET.get("date_of_transaction")
+            transaction_type = request.GET.get("transaction_type")
+            payment_method = request.GET.get("payment_method")
+
+            filters = {}
+            if customer:
+                filters["customer__id"] = customer
+            if date_of_transaction:
+                filters["date_of_transaction"] = date_of_transaction
+            if transaction_type:
+                filters["transaction_type__iexact"] = transaction_type
+            if payment_method:
+                filters["payment_method__iexact"] = payment_method
+
+            queryset = queryset.filter(**filters)
+
+            # Apply global pagination
+            paginator = PageNumberPagination()
+            paginated_qs = paginator.paginate_queryset(queryset, request)
+            serializer = WalletTransactionListSerializer(paginated_qs, many=True)
+            
+            retrieve_transactions = {
+                    'transactions_data': serializer.data,
+                    'pagination': {
+                        'total_items': paginator.page.paginator.count,  # Total number of products
+                        'page_size': paginator.page_size,  # Number of products per page
+                        'current_page': paginator.page.number,  # Current page number
+                        'total_pages': paginator.page.paginator.num_pages,  # Total number of pages
+                        'next': paginator.get_next_link(),  # URL for the next page
+                        'previous': paginator.get_previous_link(),  # URL for the previous page
+                    }
+                }
+
+            return Response({
+                'success': True,
+                'status': status.HTTP_200_OK,
+                'message': "Transaction list fetched successfully.",
+                'data': retrieve_transactions
+            })
+
+        except Exception as e:
+            logger.error(f"Transaction list error: {str(e)}")
+            return Response({
+                'success': False,
+                'status': status.HTTP_400_BAD_REQUEST,
+                'message': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
 class TransactionAPIView(APIView):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated,IsAuthorizedUser,IsNotCustomerSelf,IsCustomerRoleOnly]
+    permission_classes = [IsAuthenticated,IsAuthorizedUser,IsNotCustomerSelf,TargetUserMustBeCustomer]
     renderer_classes = [UserRenderer]
 
     def post(self, request):
@@ -39,11 +107,11 @@ class TransactionAPIView(APIView):
                     wallet.save()
                     serializer.save()
 
-                    # logger.info(f"Deposit request placed successfully & added {custom_data.get('amount', 0)} to pending balance.")
+                    # logger.info(f"Transaction request placed successfully & added {custom_data.get('amount', 0)} to balance.")
                     return Response({
                         'success': True,
                         'status': status.HTTP_200_OK,
-                        'message': "Deposit successfully placed."
+                        'message': "Transaction successfully placed."
                     }, status=status.HTTP_200_OK)
 
             error_messages = []

@@ -50,7 +50,7 @@ class IsAuthorizedUser(BasePermission):
             return True
         raise PermissionDenied("You do not have permission to perform this action.")
     
-class IsCustomerRoleOnly(BasePermission):
+class TargetUserMustBeCustomer(BasePermission):
     """
     Allows access only if the 'customer' in request data has role='customer'.
     """

@@ -1,20 +1,39 @@
 from rest_framework import renderers
 import json
 from decimal import Decimal
+from uuid import UUID
+
+# class UserRenderer(renderers.JSONRenderer):
+#     charset = 'utf-8'
+#     def render(self, data, accepted_media_type=None, renderer_context=None):
+#         response = ''
+#         # print("Inside Render funtion")
+#         if 'ErrorDetail' in str(data):
+#             # print("Inside ErrorDetails funtion")
+#             response = json.dumps(data)
+#         else:
+#             response = json.dumps(data)
+#             # print("Inside Else funtion")
+
+#         return response
 
 class UserRenderer(renderers.JSONRenderer):
     charset = 'utf-8'
-    def render(self, data, accepted_media_type=None, renderer_context=None):
-        response = ''
-        # print("Inside Render funtion")
-        if 'ErrorDetail' in str(data):
-            # print("Inside ErrorDetails funtion")
-            response = json.dumps(data)
-        else:
-            response = json.dumps(data)
-            # print("Inside Else funtion")
 
-        return response
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        def convert(obj):
+            if isinstance(obj, UUID):
+                return str(obj)
+            return obj
+
+        response = ''
+
+        if 'ErrorDetail' in str(data):
+            response = json.dumps(data, default=convert)
+        else:
+            response = json.dumps(data, default=convert)
+
+        return response.encode(self.charset)
     
 class UserRendererWithDecimal(renderers.JSONRenderer):
     charset = 'utf-8'

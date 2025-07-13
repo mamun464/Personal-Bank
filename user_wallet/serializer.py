@@ -3,7 +3,19 @@ from .models import WalletTransaction
 from account.serializer import UserProfileSerializer
 from account.permissions import AUTHORIZED_ROLES
 from account.permissions import is_user_verified
+from account.models import User
 
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'name', 'email', 'phone_no', 'role', 'user_profile_img'] 
+class WalletTransactionListSerializer(serializers.ModelSerializer):
+    customer = UserSerializer(read_only=True)
+    processed_by = UserSerializer(read_only=True)
+    class Meta:
+        model = WalletTransaction
+        fields = '__all__'
 class WalletTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = WalletTransaction
