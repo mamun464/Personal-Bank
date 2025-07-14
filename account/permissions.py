@@ -75,6 +75,25 @@ class TargetUserMustBeCustomer(BasePermission):
 
         return True
     
+class IsUserVerifiedAndEnabled(BasePermission):
+    """
+    Allows access only to users who are email-verified and active.
+    """
+
+    def has_permission(self, request, view):
+        user = request.user
+
+        if not user.is_authenticated:
+            raise PermissionDenied("Authentication credentials were not provided.")
+
+        if not user.is_active:
+            raise PermissionDenied("Your account is not active. Please contact support.")
+
+        if not getattr(user, 'is_email_verified', False):
+            raise PermissionDenied("Your email address is not verified. Please verify your email to continue.")
+
+        return True
+    
 class IsNotCustomerSelf(BasePermission):
     """
     Prevent users from performing wallet transactions on themselves.

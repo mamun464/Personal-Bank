@@ -9,7 +9,7 @@ class WalletAdmin(admin.ModelAdmin):
 
 class WalletTransactionAdmin(admin.ModelAdmin):
     list_display = (
-        'transaction_id', 'customer', 'date_of_transaction', 'transaction_type', 
+        'id', 'transaction_id', 'customer', 'date_of_transaction', 'transaction_type', 
         'payment_method', 'amount', 'processed_by', 'created_at', 'updated_at'
     )
     list_filter = ('transaction_type', 'payment_method', 'date_of_transaction', 'created_at')

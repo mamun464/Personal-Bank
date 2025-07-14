@@ -8,18 +8,82 @@ from account.renderers import UserRenderer,UserRendererWithDecimal
 from django.db import transaction
 from user_wallet.models import Wallet,WalletTransaction
 from user_wallet.serializer import WalletTransactionSerializer,WalletTransactionListSerializer
-from account.permissions import IsAuthorizedUser,IsNotCustomerSelf,TargetUserMustBeCustomer,AUTHORIZED_ROLES
+from account.permissions import IsAuthorizedUser,IsNotCustomerSelf,TargetUserMustBeCustomer,AUTHORIZED_ROLES,IsUserVerifiedAndEnabled
 from decimal import Decimal
 import logging
 from rest_framework.pagination import PageNumberPagination
+from django.shortcuts import get_object_or_404
+import uuid
 
 
 logger = logging.getLogger(__name__)
 
 
+class WalletTransactionDetailAPIView(APIView):
+    permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled]
+    authentication_classes = [JWTAuthentication]
+    renderer_classes = [UserRenderer]
+    def get(self, request):
+        user = request.user
+        required_fields = ['UUId']
+        for field in required_fields:
+            if field not in request.query_params or not request.query_params[field]:
+                return Response({
+                    'success': False,
+                    'status': status.HTTP_400_BAD_REQUEST,
+                    'message': f'{field} is missing or empty in the params',
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        UUId = request.query_params.get('UUId')
+        try:
+            uuid.UUID(UUId)
+        except (ValueError, Exception) as e:
+            return Response({
+                'success': False,
+                'status': status.HTTP_400_BAD_REQUEST,
+                'message': f'Invalid UUID: {str(e)}',
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Fetch transaction using transaction_id (UUID field)
+            transaction = WalletTransaction.objects.get(id=UUId)
+
+            # ✅ Authorization check
+            if user.role not in AUTHORIZED_ROLES and transaction.customer != user:
+                return Response({
+                    'success': False,
+                    'status': status.HTTP_403_FORBIDDEN,
+                    'message': "You are not authorized to view this transaction.",
+                    'data': None
+                },status=status.HTTP_403_FORBIDDEN)
+
+            serializer = WalletTransactionListSerializer(transaction)
+            return Response({
+                'success': True,
+                'status': status.HTTP_200_OK,
+                'message': "Transaction details fetched successfully.",
+                'data': serializer.data
+            })
+
+        except WalletTransaction.DoesNotExist:
+            return Response({
+                'success': False,
+                'status': status.HTTP_404_NOT_FOUND,
+                'message': 'Transaction not found.',
+                'data': None
+            },status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'status': status.HTTP_500_INTERNAL_SERVER_ERROR,
+                'message': f"Something went wrong: {str(e)}",
+                'data': None
+            },status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class TransactionListAPIView(APIView):
     permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [JWTAuthentication,IsUserVerifiedAndEnabled]
     renderer_classes = [UserRenderer]
 
     def get(self, request):
@@ -31,7 +95,7 @@ class TransactionListAPIView(APIView):
             else:
                 # ✅ Customers can only see their own transactions
                 queryset = WalletTransaction.objects.filter(customer=user).order_by('-created_at')
-                
+
             # ✅ Dynamic filters
             customer = request.GET.get("customer")
             date_of_transaction = request.GET.get("date_of_transaction")
@@ -72,7 +136,7 @@ class TransactionListAPIView(APIView):
                 'status': status.HTTP_200_OK,
                 'message': "Transaction list fetched successfully.",
                 'data': retrieve_transactions
-            })
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
             logger.error(f"Transaction list error: {str(e)}")
@@ -85,7 +149,7 @@ class TransactionListAPIView(APIView):
 
 class TransactionAPIView(APIView):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated,IsAuthorizedUser,IsNotCustomerSelf,TargetUserMustBeCustomer]
+    permission_classes = [IsAuthenticated,IsAuthorizedUser,IsUserVerifiedAndEnabled,IsNotCustomerSelf,TargetUserMustBeCustomer]
     renderer_classes = [UserRenderer]
 
     def post(self, request):
