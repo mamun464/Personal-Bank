@@ -10,7 +10,7 @@ from django.utils.encoding import smart_str,force_bytes,DjangoUnicodeDecodeError
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from decouple import config
 from django.core.exceptions import ValidationError
-from .utils import send_email
+from .utils import send_email,generate_password_reset_email_html
 
 FRONTEND_BASE_URL = config('FRONTEND_BASE_URL')
 
@@ -79,14 +79,14 @@ class SendPasswordResetEmailSerializer(serializers.Serializer):
             PassResetLink = f'{FRONTEND_BASE_URL}/reset-password/{EncodedUserId}/{token}/'
 
             #Email Send Code
-            bodyContent = 'Click here to RESET YOUR PASSWORD: '+PassResetLink
+            bodyContent = generate_password_reset_email_html(user.name, PassResetLink)
             data={
-                'subject': 'Reset Your Password',
+                'subject': 'Password Reset URL',
                 'body': bodyContent,
                 'to_email': user.email
 
             }
-            email_sent=send_email(data)
+            email_sent=send_email(data, is_html=True)
             if not email_sent:
                 raise ValidationError("Failed to send password reset email. Please try again later.")
             

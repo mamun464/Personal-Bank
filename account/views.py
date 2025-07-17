@@ -8,7 +8,7 @@ from account.serializer import UserRegistrationSerializer, UserProfileSerializer
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth import login
-from .utils import generate_unique_otp,send_email,flattened_serializer_errors
+from .utils import generate_unique_otp,send_email,flattened_serializer_errors,generate_otp_email_body_html
 from account.models import OtpToken,User
 from rest_framework.exceptions import AuthenticationFailed,ValidationError
 from drf_yasg.utils import swagger_auto_schema
@@ -354,15 +354,15 @@ class ResendOtpView(APIView):
             
             msg=f"Renew: {otp.otp_code}"
 
-        bodyContent = f"Here is your OTP: {otp.otp_code}"
+        bodyContent = generate_otp_email_body_html(user.name,otp.otp_code)
         data={
-            'subject': 'Email Verification Code',
+            'subject': 'OTP Verification Code',
             'body': bodyContent,
             'to_email': otp.user.email,
 
         }
         
-        email_sent=send_email(data)
+        email_sent=send_email(data,is_html=True)
 
 
         if email_sent:
@@ -620,7 +620,7 @@ class UserRegistrationView(APIView):
                         
                         },status=status.HTTP_200_OK)
                 #Send the Mail OTP verification
-                bodyContent = f"Here is your OTP: {otp.otp_code}"
+                bodyContent = generate_otp_email_body_html(new_user.name,otp.otp_code)
                 data={
                     'subject': 'Email Verification Code',
                     'body': bodyContent,

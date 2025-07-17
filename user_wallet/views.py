@@ -183,7 +183,6 @@ class TransactionAPIView(APIView):
 
                     wallet.save()
                     instance=serializer.save()
-                
                     bodyContent = generate_transaction_email_body_html(instance.transaction_id,customer.name, transaction_type, custom_data.get('amount', 0), wallet.account_balance, custom_data.get('payment_method'), custom_data.get('date_of_transaction'), user.name, user.email, user.phone_no)
                     data={
                         'subject': 'Transaction Confirmation Information',

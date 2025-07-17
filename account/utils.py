@@ -5,6 +5,7 @@ from rest_framework.exceptions import ValidationError
 from django.utils.timezone import now
 from decimal import Decimal
 from user_wallet.models import WalletTransaction
+from django.core.mail import EmailMessage
 
 @staticmethod
 def flattened_serializer_errors(serializer):
@@ -42,8 +43,7 @@ def generate_unique_otp():
 
     return otp_str
 
-from django.core.mail import EmailMessage
-# import os
+
 
 @staticmethod
 def send_email(data, is_html=False):
@@ -102,45 +102,439 @@ def generate_transaction_email_body_html(
 
     return f"""
     <html>
-    <body style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
-        <p>Dear {customer_name},</p>
-
-        <p>
-            We would like to inform you that a <strong>{transaction_type}</strong> transaction has been successfully completed on your wallet account.
-        </p>
-
-        <h4 style="margin-bottom: 10px;">Transaction Details:</h4>
-        <ul style="margin-top: 0;">
-            <li><strong>Transaction ID:</strong> {transaction_id}</li>
-            <li><strong>Amount:</strong> {float(amount):.2f}</li>
-            <li><strong>Transaction Type:</strong> {transaction_type}</li>
-            <li><strong>Payment Method:</strong> {payment_method}</li>
-            <li><strong>Date of Transaction:</strong> {date_of_transaction}</li>
-            
-        </ul>
-
-        <!-- Centered Gray Box for Wallet Balance -->
-        <div style="background-color: #f0f0f0; padding: 20px; margin: 30px auto; text-align: center; border-radius: 8px; width: 50%;">
-            <span style="font-size: 24px; font-weight: bold; color: #000;">
-                Current Wallet Balance: {float(current_balance):.2f}
-            </span>
-        </div>
-
-        <p>
-            If this transaction was not authorized by you, please contact our support team immediately.
-        </p>
-
-
-        <!-- Signature section, avoid Gmail trimming -->
-        <div style="margin-top: 30px; padding: 15px; border-top: 1px solid #ccc; background-color: #fafafa;">
-            <p style="margin: 0; font-weight: 600; color: #222;">We’re here to help you anytime.</p>
-            <p style="margin: 8px 0 0 0; color: #444;">
-                Processed By: <strong>{processed_by_name}</strong><br>
-                Email: <a href="mailto:{processed_by_email}" style="color: #2a7ae2;">{processed_by_email}</a><br>
-                Phone: <a href="tel:{processed_by_phone}" style="color: #2a7ae2;">{processed_by_phone}</a>
-            </p>
-        </div>
-    </body>
+        <head>
+            <style>
+                .detail-left {{
+                font-family: 'Times New Roman', Times, serif;
+                width: 30%;
+                padding: 4px 0;
+                }}
+                .detail-right {{
+                font-family: 'Times New Roman', Times, serif;
+                padding: 4px 0;
+                }}
+                body {{
+                background-color: #e2e1e0;
+                font-size: 100%;
+                line-height: 1.4;
+                color: #000;
+                margin: 0;
+                padding: 0;
+                }}
+                #container-table {{
+                max-width: 670px;
+                margin: 50px auto 10px;
+                background-color: #fff;
+                padding: 10px 25px;
+                border-radius: 3px;
+                box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.24);
+                border-top: solid 10px #4BB900;
+                }}
+                h3, h2 {{
+                font-family: 'Times New Roman', Times, serif;
+                color: #009900;
+                margin: 0;
+                padding: 0;
+                }}
+                .header-logo {{
+                float: left;
+                width: 13%;
+                }}
+                .header-text {{
+                font-family: 'Times New Roman', Times, serif;
+                float: right;
+                color: #009900;
+                margin-top: 15px;
+                }}
+                caption h2 {{
+                margin: 3px 0;
+                }}
+                tfooter td {{
+                font-family: 'Times New Roman', Times, serif;
+                font-size: 14px;
+                padding: 40px 15px 0 0;
+                }}
+                .footer-note {{
+                text-align: center;
+                color: #CF3E3E;
+                padding-top: 20px;
+                }}
+            </style>
+        </head>
+        <body>
+        <table id="container-table" bgcolor="#fff" cellpadding="0" cellspacing="0">
+            <tbody>
+            <tr>
+                <td>
+                <img src="https://i.ibb.co/ddKKKJ6/bank-logo.png" alt="bank_logo" class="header-logo">
+                <p class="header-text">Personal Bank</p>
+                </td>
+            </tr>
+            <tr>
+                <td align="center" style="padding-top:30px;">
+                <h3>Transaction Confirmation Receipt</h3>
+                </td>
+            </tr>
+            <tr><td style="height:10px;"></td></tr>
+            <tr>
+                <td style="font-family: 'Times New Roman', Times, serif; line-height: 1.4;">
+                <b>Dear {customer_name},</b><br><br>
+                Thank you for banking with Personal Bank. Your transaction details are given below:
+                </td>
+            </tr>
+            <tr>
+                <td>
+                <table style="margin-top:40px; width:100%; font-family: 'Times New Roman', Times, serif;" cellpadding="0" cellspacing="0">
+                    <caption style="text-align:center; margin-bottom: 20px;">
+                    <h2>Fund transfer to other bank account</h2>
+                    </caption>
+                    <tr>
+                    <td class="detail-left">Transaction Date</td>
+                    <td class="detail-right">: {date_of_transaction}</td>
+                    </tr>
+                    <tr>
+                    <td class="detail-left">Transaction ID</td>
+                    <td class="detail-right">: {transaction_id}</td>
+                    </tr>
+                    
+                    <tr>
+                    <td class="detail-left">Transaction Type</td>
+                    <td class="detail-right">: {transaction_type}</td>
+                    </tr>
+                    <tr>
+                    <td class="detail-left">Payment Method</td>
+                    <td class="detail-right">: {payment_method}</td>
+                    </tr>
+                    
+                    <tr>
+                    <td class="detail-left">Transaction Amount</td>
+                    <td class="detail-right">: {amount:.2f} TK</td>
+                    </tr>
+                    <tr>
+                    <td class="detail-left"><b>Credit Balance</b></td>
+                    <td class="detail-right">: <b>{current_balance:.2f} SR</b></td>
+                    </tr>
+                    <tr>
+                    <td class="detail-left">Processed by</td>
+                    <td class="detail-right">: {processed_by_name}, Email: {processed_by_email}, Phone: {processed_by_phone}</td>
+                    </tr>
+                </table>
+                </td>
+            </tr>
+            <tfooter>
+                <tr>
+                <td colspan="2" style="font-family: 'Times New Roman', Times, serif; font-size: 14px; padding: 40px 15px 0 0;">
+                    <b>Thank you for banking with us. Please feel free to contact us, if you need any further information.</b><br><br>
+                    <b>Phone:</b> 4215 (Local) or 0410648754<br>
+                    <b>Email:</b> help@bank.com<br>
+                </td>
+                </tr>
+                <tr>
+                <td class="footer-note" colspan="2">
+                    <b>**This is a system generated receipt. No signature required**</b>
+                </td>
+                </tr>
+            </tfooter>
+            </tbody>
+        </table>
+        </body>
     </html>
     """
 
+
+def generate_otp_email_body_html(
+    customer_name: str,
+    otp_code: str
+) -> str:
+    """
+    Generates a mobile responsive OTP email body with bank logo and name.
+    No button, just show OTP code nicely.
+    """
+
+    return f"""
+    <html>
+        <head>
+            <style>
+                /* Responsive styles */
+                @media only screen and (max-width: 600px) {{
+                .header-container {{
+                    display: block !important;
+                    text-align: center !important;
+                }}
+                .header-logo {{
+                    width: 40% !important;
+                    margin: 0 auto 10px auto !important;
+                    float: none !important;
+                    display: block !important;
+                }}
+                .header-text {{
+                    float: none !important;
+                    display: block !important;
+                    margin: 0 auto !important;
+                    font-size: 22px !important;
+                }}
+                #container-table {{
+                    width: 95% !important;
+                    margin: 20px auto !important;
+                    padding: 10px 15px !important;
+                }}
+                body, td, p {{
+                    font-size: 16px !important;
+                }}
+                }}
+
+                body {{
+                background-color: #e2e1e0;
+                font-family: 'Times New Roman', Times, serif;
+                font-size: 18px;
+                line-height: 1.4;
+                color: #000;
+                margin: 0;
+                padding: 0;
+                }}
+
+                #container-table {{
+                max-width: 670px;
+                margin: 50px auto 10px;
+                background-color: #fff;
+                padding: 20px 30px;
+                border-radius: 5px;
+                box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.24);
+                border-top: solid 10px #4BB900;
+                }}
+
+                .header-container {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 30px;
+                }}
+
+                .header-logo {{
+                width: 13%;
+                float: left;
+                }}
+
+                .header-text {{
+                font-size: 26px;
+                color: #009900;
+                font-weight: bold;
+                float: right;
+                }}
+
+                h2 {{
+                color: #009900;
+                margin-bottom: 25px;
+                font-weight: normal;
+                }}
+
+                .otp-code {{
+                font-size: 36px;
+                font-weight: bold;
+                color: #4BB900;
+                text-align: center;
+                letter-spacing: 6px;
+                margin: 20px 0 35px 0;
+                font-family: monospace, Courier New, monospace;
+                }}
+
+                p {{
+                margin: 0 0 15px 0;
+                }}
+
+                .footer-note {{
+                text-align: center;
+                color: #CF3E3E;
+                margin-top: 40px;
+                font-size: 14px;
+                }}
+
+            </style>
+        </head>
+        <body>
+        <table id="container-table" cellpadding="0" cellspacing="0" role="presentation">
+            <tbody>
+            <tr>
+                <td>
+                <div class="header-container">
+                    <img src="https://i.ibb.co/ddKKKJ6/bank-logo.png" alt="bank_logo" class="header-logo" />
+                    <p class="header-text">Personal Bank</p>
+                </div>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                <h2>Dear {customer_name},</h2>
+                <p>Use the following One-Time Password (OTP) to complete your transaction or login. This OTP is valid for <b>60 minutes</b>.</p>
+                <div class="otp-code">{otp_code}</div>
+                <p>If you did not request this, please ignore this email or contact support immediately.</p>
+                <p>Thank you for banking with Personal Bank.</p>
+                </td>
+            </tr>
+            <tr>
+                <td class="footer-note">
+                **This is an automated message, please do not reply.**
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        </body>
+    </html>
+    """
+
+def generate_password_reset_email_html(
+    customer_name: str,
+    reset_link: str,
+    expiry_hours: int = 60
+) -> str:
+    """
+    Generates a mobile-responsive password reset email with a button and
+    alternative clickable link.
+    """
+
+    return f"""
+    <html>
+        <head>
+            <style>
+                /* Responsive */
+                @media only screen and (max-width: 600px) {{
+                .header-container {{
+                    display: block !important;
+                    text-align: center !important;
+                }}
+                .header-logo {{
+                    width: 40% !important;
+                    margin: 0 auto 10px auto !important;
+                    float: none !important;
+                    display: block !important;
+                }}
+                .header-text {{
+                    float: none !important;
+                    display: block !important;
+                    margin: 0 auto !important;
+                    font-size: 22px !important;
+                }}
+                #container-table {{
+                    width: 95% !important;
+                    margin: 20px auto !important;
+                    padding: 10px 15px !important;
+                }}
+                body, td, p {{
+                    font-size: 16px !important;
+                }}
+                .btn {{
+                    width: 100% !important;
+                    box-sizing: border-box;
+                }}
+                }}
+
+                body {{
+                background-color: #e2e1e0;
+                font-family: 'Times New Roman', Times, serif;
+                font-size: 18px;
+                line-height: 1.4;
+                color: #000;
+                margin: 0;
+                padding: 0;
+                }}
+
+                #container-table {{
+                max-width: 670px;
+                margin: 50px auto 10px;
+                background-color: #fff;
+                padding: 20px 30px;
+                border-radius: 5px;
+                box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.24);
+                border-top: solid 10px #4BB900;
+                }}
+
+                .header-container {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 30px;
+                }}
+
+                .header-logo {{
+                width: 13%;
+                float: left;
+                }}
+
+                .header-text {{
+                font-size: 26px;
+                color: #009900;
+                font-weight: bold;
+                float: right;
+                }}
+
+                h2 {{
+                color: #009900;
+                margin-bottom: 25px;
+                font-weight: normal;
+                }}
+
+                .btn {{
+                display: inline-block;
+                background-color: #4BB900;
+                color: white !important;
+                text-decoration: none;
+                padding: 12px 25px;
+                border-radius: 4px;
+                font-size: 18px;
+                font-weight: bold;
+                text-align: center;
+                cursor: pointer;
+                margin: 25px 0 15px 0;
+                }}
+
+                .alt-link {{
+                font-size: 14px;
+                color: #333;
+                word-break: break-all;
+                }}
+
+                .footer-note {{
+                text-align: center;
+                color: #CF3E3E;
+                margin-top: 40px;
+                font-size: 14px;
+                }}
+
+            </style>
+        </head>
+        <body>
+            <table id="container-table" cellpadding="0" cellspacing="0" role="presentation">
+                <tbody>
+                <tr>
+                    <td>
+                    <div class="header-container">
+                        <img src="https://i.ibb.co/ddKKKJ6/bank-logo.png" alt="bank_logo" class="header-logo" />
+                        <p class="header-text">Personal Bank</p>
+                    </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                    <h2>Dear {customer_name},</h2>
+                    <p>You requested to reset your password. Please click the button below to set a new password. The link will expire in <b>{expiry_hours} hours</b>.</p>
+
+                    <a href="{reset_link}" target="_blank" rel="noopener noreferrer" class="btn">Reset Password</a>
+
+                    <p>If the button does not work, copy and paste the following link into your browser:</p>
+                    <p class="alt-link"><a href="{reset_link}" target="_blank" rel="noopener noreferrer">{reset_link}</a></p>
+
+                    <p>If you did not request this password reset, please ignore this email or contact support immediately.</p>
+
+                    <p>Thank you for banking with Personal Bank.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="footer-note">
+                    **This is an automated message, please do not reply.**
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </body>
+    </html>
+    """
