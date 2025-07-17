@@ -89,7 +89,7 @@ class IsUserVerifiedAndEnabled(BasePermission):
         if not user.is_active:
             raise PermissionDenied("Your account is not active. Please contact support.")
 
-        if not getattr(user, 'is_email_verified', False):
+        if not getattr(user, 'is_verified', False):
             raise PermissionDenied("Your email address is not verified. Please verify your email to continue.")
 
         return True

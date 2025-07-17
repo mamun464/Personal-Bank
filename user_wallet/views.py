@@ -14,6 +14,8 @@ import logging
 from rest_framework.pagination import PageNumberPagination
 from django.shortcuts import get_object_or_404
 import uuid
+from account.utils import send_email,generate_transaction_email_body_html
+from django.utils.timezone import now
 
 
 logger = logging.getLogger(__name__)
@@ -163,13 +165,34 @@ class TransactionAPIView(APIView):
             with transaction.atomic():
                 serializer = WalletTransactionSerializer(data=custom_data, context={'request': request})
                 if serializer.is_valid():
-
-                    wallet = Wallet.objects.select_for_update().get(user=user.id)
-
+                    customer_id = custom_data.get('customer')
+                    wallet = Wallet.objects.select_for_update().get(user=customer_id)
+                    customer = wallet.user
                     # added to the user's pending balance
-                    wallet.account_balance += Decimal(custom_data.get('amount', 0))
+                    transaction_type = custom_data.get('transaction_type')
+
+                    if transaction_type == 'deposit':
+                        wallet.account_balance += Decimal(custom_data.get('amount', 0))
+
+                    elif transaction_type in ['withdrawal', 'payment_out']:
+                        amount = Decimal(custom_data.get('amount', 0))
+                        if wallet.account_balance >= amount:
+                            wallet.account_balance -= amount
+                        else:
+                            raise ValueError("Insufficient funds for this transaction.")
+
                     wallet.save()
-                    serializer.save()
+                    instance=serializer.save()
+                
+                    bodyContent = generate_transaction_email_body_html(instance.transaction_id,customer.name, transaction_type, custom_data.get('amount', 0), wallet.account_balance, custom_data.get('payment_method'), custom_data.get('date_of_transaction'), user.name, user.email, user.phone_no)
+                    data={
+                        'subject': 'Transaction Confirmation Information',
+                        'body': bodyContent,
+                        'to_email': customer.email,
+
+                    }
+                    
+                    send_email(data, is_html=True)
 
                     # logger.info(f"Transaction request placed successfully & added {custom_data.get('amount', 0)} to balance.")
                     return Response({
@@ -181,14 +204,8 @@ class TransactionAPIView(APIView):
             error_messages = []
             for field, errors in serializer.errors.items():
                 for error in errors:
-                    if field == 'payment_method':
-                        # Dynamically get the valid choices for 'payment_method'
-                        valid_choices = [choice[0] for choice in WalletTransaction.PAYMENT_METHOD_CHOICES]
-                        error_messages.append(
-                            f"{field}: Invalid value. Choose one of the following valid options: {', '.join(valid_choices)}."
-                        )
-                    else:
-                        error_messages.append(f"{field}: {error}")
+                    error_messages.append(f"{field}: {error}")
+                    
             logger.error("\n".join(error_messages))
             return Response({
                 "success": False,

@@ -57,6 +57,39 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'document_photo_url': 'This field is required for bank transfer deposits.'
                 })
+        # ✅ For deposit, payment_method cannot be 'wallet'
+        elif transaction_type == 'deposit' and payment_method == 'wallet':
+            raise serializers.ValidationError({
+                'payment_method':'For deposit payment method cannot be wallet. Please select Cash or Bank Transfer.'
+            })
+        
+        # ✅ For withdrawal, payment_method cannot be 'wallet'
+        elif transaction_type == 'withdrawal' and payment_method == 'wallet':
+            raise serializers.ValidationError({
+                'payment_method':'For withdrawal, payment method cannot be wallet. Please select Cash or Bank Transfer.'
+            })
+
+        # ✅ For withdrawal, receipt_reference_no and document_photo_url are required
+        elif transaction_type == 'withdrawal' and payment_method == 'bank_transfer':
+            if not receipt_reference_no:
+                raise serializers.ValidationError({
+                    'receipt_reference_no': 'This field is required for bank transfer deposits.'
+                })
+            if not document_photo_url:
+                raise serializers.ValidationError({
+                    'document_photo_url': 'This field is required for bank transfer deposits.'
+                })
+    
+        # ✅ For payment_out, only 'wallet' is allowed as payment_method
+        elif transaction_type == 'payment_out':
+            if payment_method != 'wallet':
+                raise serializers.ValidationError({
+                    'payment_method':'For payment out transactions, only wallet balance is allowed as payment method.'
+                })
+            # Nullify these fields in this case too
+            attrs['receipt_reference_no'] = None
+            attrs['document_photo_url'] = None
+
         else:
             # ✅ In all other cases, nullify these fields
             attrs['receipt_reference_no'] = None
