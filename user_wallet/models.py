@@ -1,7 +1,7 @@
 import uuid
 from django.db import models
 from django.utils.timezone import now
-from account.models import User  # Replace 'your_app' with the actual app where your User model is defined
+from account.models import User  
 from django.core.exceptions import ValidationError
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
