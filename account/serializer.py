@@ -17,7 +17,7 @@ FRONTEND_BASE_URL = config('FRONTEND_BASE_URL')
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['name', 'phone_no', 'date_of_birth']
+        fields = ['name', 'phone_no', 'date_of_birth', 'user_profile_img']
         extra_kwargs = {
             'phone_no': {'required': False},
             'name': {'required': False},
