@@ -11,6 +11,8 @@ urlpatterns = [
     path('send-reset-link/', SendPasswordResetEmailView.as_view(),name='send-reset-link'),
     path('rest-password/<uid>/<token>/', UserPasswordResetView.as_view(),name='rest-password'),
 
+    path('user-list/', UserListView.as_view(), name='user-list'),
+    
     path('change-active-status/', ChangeUserActiveStatusView.as_view(), name='change-active-status'),
     path('update-profile/', UpdateOwnProfileView.as_view(), name='update-own-profile'),
     path('profile/', UserProfileDetailView.as_view(), name='user-profile-detail'),

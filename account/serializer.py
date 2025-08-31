@@ -14,6 +14,16 @@ from .utils import send_email,generate_password_reset_email_html
 
 FRONTEND_BASE_URL = config('FRONTEND_BASE_URL')
 
+
+class UserListSerializer(serializers.ModelSerializer):
+    """
+    Serializer for listing users (customers and suppliers) with basic information
+    """
+    class Meta:
+        model = User
+        exclude = ['password', ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User

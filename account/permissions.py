@@ -7,12 +7,26 @@ from uuid import UUID
 
 
 AUTHORIZED_ROLES = ['admin', 'CEO', 'employee']
+GRAND_AUTHORIZED_ROLES = ['admin', 'CEO']
 ROLE_HIERARCHY = {
     'admin': 3,
     'CEO': 2,
     'employee': 1,
     'customer': 0
 }
+
+class IsAuthorizedUser(BasePermission):
+    """
+    Custom permission to allow only authorized users to perform actions.
+    - Only users with roles in AUTHORIZED_ROLES can perform the action.
+    """
+
+    def has_permission(self, request, view):
+        if request.user.role in AUTHORIZED_ROLES:
+            return True
+        raise PermissionDenied("You do not have permission to perform this action.")
+    
+    
 
 class CanChangeActiveStatus(BasePermission):
     """

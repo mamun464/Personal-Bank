@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status,serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
-from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer,VerifyEmailSerializer,SendPasswordResetEmailSerializer,UserPasswordRestSerializer,UserActiveStatusSerializer,UserProfileUpdateSerializer
+from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer,VerifyEmailSerializer,SendPasswordResetEmailSerializer,UserPasswordRestSerializer,UserActiveStatusSerializer,UserProfileUpdateSerializer,UserListSerializer
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth import login
@@ -15,10 +15,11 @@ from drf_yasg.utils import swagger_auto_schema
 import re
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
-from account.permissions import CanChangeActiveStatus,is_authorized_role
+from account.permissions import CanChangeActiveStatus,is_authorized_role,IsAuthorizedUser,GRAND_AUTHORIZED_ROLES
 from drf_yasg import openapi
 import uuid
 from user_wallet.models import Wallet
+from rest_framework.pagination import PageNumberPagination
 
 
 # token generator
@@ -29,6 +30,77 @@ def get_tokens_for_user(user):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
+class UserListView(APIView):
+    """
+    API view to get list of customers and suppliers with filtering capabilities
+    Only accessible by admin users
+    """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthorizedUser]
+    renderer_classes = [UserRenderer]
+    
+    def get(self, request):
+        try:
+            # Get query parameters for filtering
+            search = request.query_params.get('search', '')
+            is_active = request.query_params.get('is_active')
+            is_verified = request.query_params.get('is_verified')
+            
+            # Start with all users excluding admins
+            users = User.objects.exclude(role__in=GRAND_AUTHORIZED_ROLES)
+            
+            # Apply filters
+            if is_active is not None:
+                is_active_bool = is_active.lower() == 'true'
+                users = users.filter(is_active=is_active_bool)
+            
+            if is_verified is not None:
+                is_verified_bool = is_verified.lower() == 'true'
+                users = users.filter(is_verified=is_verified_bool)
+            
+            # Apply search filter
+            if search:
+                users = users.filter(
+                    Q(name__icontains=search) |
+                    Q(email__icontains=search) |
+                    Q(phone_no__icontains=search)
+                )
+            
+            # Order by creation date (newest first)
+            users = users.order_by('-created_at')
+            
+            # Apply pagination
+            paginator = PageNumberPagination()
+            paginator.page_size = 5  # 20 users per page
+            paginated_users = paginator.paginate_queryset(users, request)
+            
+            # Serialize the data
+            serializer = UserListSerializer(paginated_users, many=True)
+            
+            return Response({
+                'success': True,
+                'status': status.HTTP_200_OK,
+                'message': f'Successfully retrieved {len(serializer.data)} users',
+                'data': {
+                    'users': serializer.data,
+                    'pagination': {
+                        'total_items': paginator.page.paginator.count,
+                        'page_size': paginator.page_size,
+                        'current_page': paginator.page.number,
+                        'total_pages': paginator.page.paginator.num_pages,
+                        'next': paginator.get_next_link(),
+                        'previous': paginator.get_previous_link(),
+                    }
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'status': status.HTTP_500_INTERNAL_SERVER_ERROR,
+                'message': f'An error occurred while retrieving users: {str(e)}',
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
 
 class UserProfileDetailView(APIView):
     permission_classes = [IsAuthenticated]
