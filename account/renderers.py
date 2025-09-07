@@ -2,6 +2,7 @@ from rest_framework import renderers
 import json
 from decimal import Decimal
 from uuid import UUID
+from datetime import datetime, date
 
 # class UserRenderer(renderers.JSONRenderer):
 #     charset = 'utf-8'
@@ -24,6 +25,11 @@ class UserRenderer(renderers.JSONRenderer):
         def convert(obj):
             if isinstance(obj, UUID):
                 return str(obj)
+            elif isinstance(obj, Decimal):
+                return float(obj)
+            # 3. Handle datetime/date
+            elif isinstance(obj, (datetime, date)):
+                return obj.isoformat()
             return obj
 
         response = ''

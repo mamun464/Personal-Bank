@@ -15,6 +15,23 @@ from .utils import send_email,generate_password_reset_email_html
 FRONTEND_BASE_URL = config('FRONTEND_BASE_URL')
 
 
+
+# serializers.py
+from rest_framework import serializers
+
+class CardInfoSerializer(serializers.Serializer):
+    field = serializers.CharField()
+    total_amount = serializers.FloatField()
+    progress = serializers.BooleanField()
+    progress_percentage = serializers.FloatField()
+    
+
+class DashboardCardsSerializer(serializers.Serializer):
+    deposit = CardInfoSerializer()
+    withdrawal = CardInfoSerializer()
+    todays_balance = CardInfoSerializer()
+
+
 class UserListSerializer(serializers.ModelSerializer):
     """
     Serializer for listing users (customers and suppliers) with basic information

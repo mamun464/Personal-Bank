@@ -7,6 +7,23 @@ from decimal import Decimal
 from user_wallet.models import WalletTransaction
 from django.core.mail import EmailMessage
 
+
+@staticmethod
+def calculate_progress(today_total, seven_day_sum):
+    """
+    Compare today's total with the last 7-day total (not average).
+    """
+    if seven_day_sum <= 0:
+        return (False, 0)
+
+    progress_percentage = ((today_total - seven_day_sum) / seven_day_sum) * 100
+    progress = progress_percentage > 0
+    # Allow negatives and positives, no capping at 100
+    return (progress, round(progress_percentage, 2))
+
+
+
+
 @staticmethod
 def flattened_serializer_errors(serializer):
     """

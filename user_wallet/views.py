@@ -14,11 +14,94 @@ import logging
 from rest_framework.pagination import PageNumberPagination
 from django.shortcuts import get_object_or_404
 import uuid
-from account.utils import send_email,generate_transaction_email_body_html
-from django.utils.timezone import now
+from account.utils import send_email,generate_transaction_email_body_html,calculate_progress
+from django.utils.timezone import now, timedelta
+from django.db.models import Sum
 
 
 logger = logging.getLogger(__name__)
+
+class DashboardOverviewAPIView(APIView):
+    permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled,IsAuthorizedUser]
+    authentication_classes = [JWTAuthentication]
+    renderer_classes = [UserRenderer]
+    def get(self, request):
+        try:
+            today = now().date()
+            seven_days_ago = today - timedelta(days=7)
+            print("seven_days_ago:", seven_days_ago)
+
+            # --- Today's totals ---
+            today_deposit_total = WalletTransaction.objects.filter(
+                transaction_type='deposit', created_at__date=today
+            ).aggregate(total=Sum('amount'))['total'] or 0
+
+            today_withdraw_total = WalletTransaction.objects.filter(
+                transaction_type='withdrawal', created_at__date=today
+            ).aggregate(total=Sum('amount'))['total'] or 0
+
+            today_payout_total = WalletTransaction.objects.filter(
+                transaction_type='payment_out', created_at__date=today
+            ).aggregate(total=Sum('amount'))['total'] or 0
+
+            today_balance = today_deposit_total - (today_withdraw_total + today_payout_total)
+
+            # --- Last 7 days totals (excluding today) ---
+            deposit_sum_7_days = WalletTransaction.objects.filter(
+                transaction_type='deposit',
+                created_at__date__range=[seven_days_ago, today - timedelta(days=1)]
+            ).aggregate(total=Sum('amount'))['total'] or 0
+
+            withdraw_sum_7_days = WalletTransaction.objects.filter(
+                transaction_type='withdrawal',
+                created_at__date__range=[seven_days_ago, today - timedelta(days=1)]
+            ).aggregate(total=Sum('amount'))['total'] or 0
+
+            payout_sum_7_days = WalletTransaction.objects.filter(
+                transaction_type='payment_out',
+                created_at__date__range=[seven_days_ago, today - timedelta(days=1)]
+            ).aggregate(total=Sum('amount'))['total'] or 0
+
+            balance_sum_7_days = deposit_sum_7_days - (withdraw_sum_7_days + payout_sum_7_days)
+
+            deposit_progress, deposit_percentage = calculate_progress(today_deposit_total, deposit_sum_7_days)
+            withdraw_progress, withdraw_percentage = calculate_progress(today_withdraw_total, withdraw_sum_7_days)
+            balance_progress, balance_percentage = calculate_progress(today_balance, balance_sum_7_days)
+
+            # --- Final API response ---
+            data = {
+                "deposit": {
+                    "field": "Deposit",
+                    "total_amount": float(today_deposit_total),
+                    "progress": deposit_progress,
+                    "progress_percentage": deposit_percentage
+                },
+                "withdrawal": {
+                    "field": "Withdrawal",
+                    "total_amount": float(today_withdraw_total),
+                    "progress": withdraw_progress,
+                    "progress_percentage": withdraw_percentage
+                },
+                "todays_balance": {
+                    "field": "Today’s Balance",
+                    "total_amount": float(today_balance),
+                    "progress": balance_progress,
+                    "progress_percentage": balance_percentage
+                }
+            }
+
+            return Response({
+                'success': True,
+                'status': status.HTTP_200_OK,
+                'message': "Dashboard overview data fetched successfully.",
+                'data': data
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                'success': False,
+                'status': status.HTTP_500_INTERNAL_SERVER_ERROR,
+                'message': f"Something went wrong: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class WalletTransactionDetailAPIView(APIView):

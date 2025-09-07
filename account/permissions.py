@@ -15,19 +15,9 @@ ROLE_HIERARCHY = {
     'customer': 0
 }
 
-class IsAuthorizedUser(BasePermission):
-    """
-    Custom permission to allow only authorized users to perform actions.
-    - Only users with roles in AUTHORIZED_ROLES can perform the action.
-    """
 
-    def has_permission(self, request, view):
-        if request.user.role in AUTHORIZED_ROLES:
-            return True
-        raise PermissionDenied("You do not have permission to perform this action.")
     
     
-
 class CanChangeActiveStatus(BasePermission):
     """
     Custom permission to allow only authorized users to change is_active status.
@@ -56,7 +46,8 @@ class CanChangeActiveStatus(BasePermission):
     
 class IsAuthorizedUser(BasePermission):
     """
-    Grants access only to users with roles in AUTHORIZED_ROLES.
+    Custom permission to allow only authorized users to perform actions.
+    - Only users with roles in AUTHORIZED_ROLES can perform the action.
     """
 
     def has_permission(self, request, view):
