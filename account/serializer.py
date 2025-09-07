@@ -17,7 +17,7 @@ FRONTEND_BASE_URL = config('FRONTEND_BASE_URL')
 
 
 # serializers.py
-from rest_framework import serializers
+
 
 class CardInfoSerializer(serializers.Serializer):
     field = serializers.CharField()

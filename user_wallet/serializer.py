@@ -6,6 +6,12 @@ from account.permissions import is_user_verified
 from account.models import User
 
 
+class WalletOverviewSerializer(serializers.Serializer):
+    realtime_balance = serializers.FloatField()
+    monthly_transactions = serializers.ListField(
+        child=serializers.FloatField()
+    )
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User

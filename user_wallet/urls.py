@@ -5,7 +5,8 @@ urlpatterns = [
     path('transaction/', TransactionAPIView.as_view(), name='transaction'),
     path('transaction-history/', TransactionListAPIView.as_view(), name='transaction-history'),
     path('transaction-details/', WalletTransactionDetailAPIView.as_view(), name='transaction-detail'),
-    path('dashboard/overview/', DashboardOverviewAPIView.as_view(), name='dashboard-cards')
+    path('dashboard-cards/overview/', DashboardOverviewAPIView.as_view(), name='dashboard-cards'),
+    path('wallet-cards/overview/', WalletOverviewOptimizedAPIView.as_view(), name='wallet-cards'),
 
     # path('balance/', WalletBalanceView.as_view(), name='wallet-balance'),
 

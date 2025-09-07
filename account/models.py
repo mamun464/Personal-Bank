@@ -5,6 +5,7 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.utils.timezone import now
 import secrets
 import random
+from django.core.exceptions import ValidationError
 
 
 # Create your UserManager here.
@@ -85,8 +86,23 @@ class User(AbstractBaseUser,PermissionsMixin):
         verbose_name = 'User'
         verbose_name_plural = 'Users'
 
+        constraints = [
+        models.UniqueConstraint(
+            fields=['role'],
+            condition=models.Q(role='CEO'),
+            name='unique_ceo_role'
+        )
+    ]
+
 
     def save(self, *args, **kwargs):
+        # --- Prevent multiple CEOs ---
+        if self.role == 'CEO':
+            # Exclude current instance if updating
+            existing_ceo = User.objects.filter(role='CEO').exclude(pk=self.pk)
+            if existing_ceo.exists():
+                raise ValidationError("There can be only one CEO in the system.")
+
         if self.pk is not None:
             # Check if this is an update (object exists in DB)
             if User.objects.filter(pk=self.pk).exists():

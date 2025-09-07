@@ -7,7 +7,8 @@ from rest_framework.permissions import IsAuthenticated
 from account.renderers import UserRenderer,UserRendererWithDecimal
 from django.db import transaction
 from user_wallet.models import Wallet,WalletTransaction
-from user_wallet.serializer import WalletTransactionSerializer,WalletTransactionListSerializer
+from account.models import User
+from user_wallet.serializer import WalletTransactionSerializer,WalletTransactionListSerializer,WalletOverviewSerializer
 from account.permissions import IsAuthorizedUser,IsNotCustomerSelf,TargetUserMustBeCustomer,AUTHORIZED_ROLES,IsUserVerifiedAndEnabled
 from decimal import Decimal
 import logging
@@ -16,10 +17,78 @@ from django.shortcuts import get_object_or_404
 import uuid
 from account.utils import send_email,generate_transaction_email_body_html,calculate_progress
 from django.utils.timezone import now, timedelta
-from django.db.models import Sum
+from django.db.models import Sum, Case, When, F, DecimalField
 
 
 logger = logging.getLogger(__name__)
+
+
+class WalletOverviewOptimizedAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        current_year = now().year
+
+        # --- 1) Realtime balance ---
+        if user.role in AUTHORIZED_ROLES:
+            ceo_user = User.objects.filter(role="CEO").first()
+            realtime_balance = (
+                Wallet.objects.filter(user=ceo_user)
+                .values_list("account_balance", flat=True)
+                .first()
+                if ceo_user else 0
+            )
+            transactions_queryset = WalletTransaction.objects.filter(
+                created_at__year=current_year
+            )
+        else:
+            wallet = Wallet.objects.filter(user=user).first()
+            realtime_balance = wallet.account_balance if wallet else 0
+            transactions_queryset = WalletTransaction.objects.filter(
+                customer=user,
+                created_at__year=current_year
+            )
+
+        # --- 2) Monthly net transactions in a single query ---
+        monthly_data = (
+            transactions_queryset
+            .annotate(month=F('created_at__month'))
+            .values('month')
+            .annotate(
+                net=Sum(
+                    Case(
+                        When(transaction_type='deposit', then=F('amount')),
+                        When(transaction_type='withdrawal', then=-F('amount')),
+                        When(transaction_type='payment_out', then=-F('amount')),
+                        default=0,
+                        output_field=DecimalField()
+                    )
+                )
+            )
+            .order_by('month')
+        )
+
+        # Prepare list only up to current month
+        current_month = now().month
+        monthly_transactions = [0] * current_month
+        for entry in monthly_data:
+            month_idx = entry['month'] - 1
+            if month_idx < current_month:
+                monthly_transactions[month_idx] = float(entry['net'] or 0)
+
+        response_data = {
+            "realtime_balance": float(realtime_balance or 0),
+            "monthly_transactions": monthly_transactions
+        }
+
+        serializer = WalletOverviewSerializer(response_data)
+        return Response({
+            "success": True,
+            "status": 200,
+            "message": "Wallet overview fetched successfully.",
+            "data": serializer.data
+        })
 
 class DashboardOverviewAPIView(APIView):
     permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled,IsAuthorizedUser]
@@ -63,6 +132,14 @@ class DashboardOverviewAPIView(APIView):
             ).aggregate(total=Sum('amount'))['total'] or 0
 
             balance_sum_7_days = deposit_sum_7_days - (withdraw_sum_7_days + payout_sum_7_days)
+
+            # print("today_deposit_total:", today_deposit_total)
+            # print("today_withdraw_total:", today_withdraw_total)
+            # print("today_balance:", today_balance)
+            # print("----------------------------------------")
+            # print("deposit_sum_7_days:", deposit_sum_7_days)
+            # print("withdraw_sum_7_days:", withdraw_sum_7_days)
+            # print("balance_sum_7_days:", balance_sum_7_days)
 
             deposit_progress, deposit_percentage = calculate_progress(today_deposit_total, deposit_sum_7_days)
             withdraw_progress, withdraw_percentage = calculate_progress(today_withdraw_total, withdraw_sum_7_days)
@@ -249,16 +326,18 @@ class TransactionAPIView(APIView):
                 serializer = WalletTransactionSerializer(data=custom_data, context={'request': request})
                 if serializer.is_valid():
                     customer_id = custom_data.get('customer')
+                    ceo_wallet = Wallet.objects.select_for_update().get(user__role='CEO')
                     wallet = Wallet.objects.select_for_update().get(user=customer_id)
                     customer = wallet.user
-                    # added to the user's pending balance
                     transaction_type = custom_data.get('transaction_type')
 
                     if transaction_type == 'deposit':
                         wallet.account_balance += Decimal(custom_data.get('amount', 0))
+                        ceo_wallet.account_balance += Decimal(custom_data.get('amount', 0))
 
                     elif transaction_type in ['withdrawal', 'payment_out']:
                         amount = Decimal(custom_data.get('amount', 0))
+                        ceo_wallet.account_balance -= amount
                         if wallet.account_balance >= amount:
                             wallet.account_balance -= amount
                         else:
@@ -266,6 +345,7 @@ class TransactionAPIView(APIView):
 
                     wallet.save()
                     instance=serializer.save()
+                    ceo_wallet.save()
                     bodyContent = generate_transaction_email_body_html(instance.transaction_id,customer.name, transaction_type, custom_data.get('amount', 0), wallet.account_balance, custom_data.get('payment_method'), custom_data.get('date_of_transaction'), user.name, user.email, user.phone_no)
                     data={
                         'subject': 'Transaction Confirmation Information',
