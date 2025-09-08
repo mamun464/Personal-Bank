@@ -17,78 +17,60 @@ from django.shortcuts import get_object_or_404
 import uuid
 from account.utils import send_email,generate_transaction_email_body_html,calculate_progress
 from django.utils.timezone import now, timedelta
-from django.db.models import Sum, Case, When, F, DecimalField
+from django.db.models.functions import ExtractMonth
+from django.db.models import Sum
+from collections import defaultdict
 
 
 logger = logging.getLogger(__name__)
 
 
 class WalletOverviewOptimizedAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled]
+    authentication_classes = [JWTAuthentication]
+    renderer_classes = [UserRenderer]
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request):
         user = request.user
-        current_year = now().year
+        today = now().date()
+        current_year = today.year
+        current_month = today.month
 
-        # --- 1) Realtime balance ---
+        # --- Step 1: Realtime balance ---
         if user.role in AUTHORIZED_ROLES:
             ceo_user = User.objects.filter(role="CEO").first()
-            realtime_balance = (
-                Wallet.objects.filter(user=ceo_user)
-                .values_list("account_balance", flat=True)
-                .first()
-                if ceo_user else 0
-            )
-            transactions_queryset = WalletTransaction.objects.filter(
-                created_at__year=current_year
-            )
+            wallet = Wallet.objects.filter(user=ceo_user).first()
+            realtime_balance = wallet.account_balance if wallet else 0.0
+            tx_queryset = WalletTransaction.objects.filter(created_at__year=current_year)
         else:
             wallet = Wallet.objects.filter(user=user).first()
-            realtime_balance = wallet.account_balance if wallet else 0
-            transactions_queryset = WalletTransaction.objects.filter(
-                customer=user,
-                created_at__year=current_year
-            )
+            realtime_balance = wallet.account_balance if wallet else 0.0
+            tx_queryset = WalletTransaction.objects.filter(customer=user, created_at__year=current_year)
 
-        # --- 2) Monthly net transactions in a single query ---
-        monthly_data = (
-            transactions_queryset
-            .annotate(month=F('created_at__month'))
-            .values('month')
-            .annotate(
-                net=Sum(
-                    Case(
-                        When(transaction_type='deposit', then=F('amount')),
-                        When(transaction_type='withdrawal', then=-F('amount')),
-                        When(transaction_type='payment_out', then=-F('amount')),
-                        default=0,
-                        output_field=DecimalField()
-                    )
-                )
-            )
-            .order_by('month')
-        )
+        # --- Step 2: Annotate month ---
+        tx_queryset = tx_queryset.annotate(month=ExtractMonth('created_at')).order_by('customer_id', 'month', '-created_at')
 
-        # Prepare list only up to current month
-        current_month = now().month
-        monthly_transactions = [0] * current_month
-        for entry in monthly_data:
-            month_idx = entry['month'] - 1
-            if month_idx < current_month:
-                monthly_transactions[month_idx] = float(entry['net'] or 0)
+        # --- Step 3: Pick latest transaction per user per month and sum ---
+        monthly_dict = defaultdict(dict)  # {month: {customer_id: cumulative_balance}}
+        for tx in tx_queryset:
+            if tx.customer_id not in monthly_dict[tx.month]:
+                monthly_dict[tx.month][tx.customer_id] = float(tx.cumulative_balance or 0)
 
-        response_data = {
-            "realtime_balance": float(realtime_balance or 0),
-            "monthly_transactions": monthly_transactions
-        }
+        # --- Step 4: Sum latest balances per month ---
+        monthly_transactions = []
+        for m in range(1, current_month + 1):
+            month_sum = sum(monthly_dict[m].values()) if m in monthly_dict else 0.0
+            monthly_transactions.append(month_sum)
 
-        serializer = WalletOverviewSerializer(response_data)
         return Response({
             "success": True,
             "status": 200,
             "message": "Wallet overview fetched successfully.",
-            "data": serializer.data
-        })
+            "data": {
+                "realtime_balance": float(realtime_balance),
+                "monthly_transactions": monthly_transactions,
+            }
+        }, status=status.HTTP_200_OK)
 
 class DashboardOverviewAPIView(APIView):
     permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled,IsAuthorizedUser]

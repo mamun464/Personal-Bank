@@ -10,7 +10,7 @@ class WalletAdmin(admin.ModelAdmin):
 class WalletTransactionAdmin(admin.ModelAdmin):
     list_display = (
         'id', 'transaction_id', 'customer', 'date_of_transaction', 'transaction_type', 
-        'payment_method', 'amount', 'processed_by', 'created_at', 'updated_at'
+        'payment_method', 'amount', 'cumulative_balance','comment', 'processed_by', 'created_at', 'updated_at'
     )
     list_filter = ('transaction_type', 'payment_method', 'date_of_transaction', 'created_at')
     search_fields = (
@@ -23,7 +23,7 @@ class WalletTransactionAdmin(admin.ModelAdmin):
         (None, {
             'fields': (
                 'transaction_id', 'customer', 'date_of_transaction', 'transaction_type', 'payment_method', 
-                'amount', 'document_photo_url', 'receipt_reference_no', 'processed_by'
+                'amount', 'document_photo_url', 'receipt_reference_no','cumulative_balance', 'comment' ,'processed_by'
             )
         }),
         ('Timestamps', {

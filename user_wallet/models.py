@@ -56,8 +56,10 @@ class WalletTransaction(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     document_photo_url = models.URLField(max_length=1024, null=True, blank=True)  # Allow null/blank
     receipt_reference_no = models.CharField(unique=True, max_length=255, null=True, blank=True)  # Allow null/blank
+    cumulative_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    comment = models.TextField(null=True, blank=True)
     
-    processed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="processed_withdrawals")
+    processed_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name="processed_withdrawals")
     
     created_at = models.DateTimeField(auto_now_add=True)  # Set only on creation
     updated_at = models.DateTimeField(null=True, blank=True)  # Set only on updates
@@ -67,6 +69,15 @@ class WalletTransaction(models.Model):
         Override the save method to always call clean before saving.
         """
         self.clean()  # Call the clean method to perform validation
+        if self._state.adding:  # only when creating new transaction
+            last_txn = WalletTransaction.objects.filter(customer=self.customer).order_by('-created_at').first()
+            previous_balance = last_txn.cumulative_balance if last_txn else 0
+
+            if self.transaction_type == 'deposit':
+                self.cumulative_balance = previous_balance + self.amount
+            else:  # withdrawal or payout
+                self.cumulative_balance = previous_balance - self.amount
+
         if self.pk is not None:
             # Check if this is an update (object exists in DB)
             if WalletTransaction.objects.filter(pk=self.pk).exists():

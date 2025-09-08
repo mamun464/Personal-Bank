@@ -35,6 +35,7 @@ class WalletTransactionSerializer(serializers.ModelSerializer):
             'amount',
             'document_photo_url',
             'receipt_reference_no',
+            'comment',
             'processed_by',
         ]
         read_only_fields = ['id', 'transaction_id']
