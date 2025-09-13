@@ -25,7 +25,7 @@ from collections import defaultdict
 logger = logging.getLogger(__name__)
 
 
-class WalletOverviewOptimizedAPIView(APIView):
+class WalletOverviewAPIView(APIView):
     permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled]
     authentication_classes = [JWTAuthentication]
     renderer_classes = [UserRenderer]
