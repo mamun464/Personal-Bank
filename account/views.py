@@ -40,8 +40,7 @@ class UserUpdateAPIView(APIView):
 
     def patch(self, request, user_id):
         try:
-            valid_uuid = uuid.UUID(user_id.strip())  # Strip extra whitespace and validate
-            user_to_update = User.objects.get(id=valid_uuid)
+            user_to_update = User.objects.get(id=user_id)
         except (ValueError, User.DoesNotExist):
             return Response({
                 "success": False,
@@ -50,6 +49,13 @@ class UserUpdateAPIView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
             
         requester = request.user
+        # Block self-update for authorized users
+        if requester.id == user_to_update.id :
+            return Response({
+                'success': False,
+                'status': status.HTTP_403_FORBIDDEN,
+                'message': 'You cannot update your own account via this endpoint.'
+            }, status=status.HTTP_403_FORBIDDEN)
 
         serializer = UserUpdateSerializer(user_to_update, data=request.data, partial=True)
 
