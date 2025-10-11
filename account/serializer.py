@@ -31,6 +31,43 @@ class DashboardCardsSerializer(serializers.Serializer):
     withdrawal = CardInfoSerializer()
     todays_balance = CardInfoSerializer()
 
+class UserUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        # Include all model fields to allow checking logic, but not all are editable
+        fields = [
+            'name',
+            'email',
+            'phone_no',
+            'date_of_birth',
+            'is_verified',
+            'user_profile_img',
+            'role',
+            'is_staff',
+            'is_active',
+            'is_superuser',
+        ]
+        read_only_fields = ['is_verified', 'role', 'user_profile_img', 'is_staff', 'is_superuser']
+
+    def update(self, instance, validated_data):
+        # If email changed, reset verification
+        new_email = validated_data.get('email')
+        if new_email and new_email != instance.email:
+            instance.is_verified = False
+
+        # Prevent role, is_verified, and user_profile_img from being modified
+        validated_data.pop('role', None)
+        validated_data.pop('is_verified', None)
+        validated_data.pop('user_profile_img', None)
+        validated_data.pop('is_staff', None)
+        validated_data.pop('is_superuser', None)
+
+        # Apply updates
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
 
 class UserListSerializer(serializers.ModelSerializer):
     """
