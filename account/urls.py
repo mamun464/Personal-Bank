@@ -15,6 +15,7 @@ urlpatterns = [
     
     path('change-active-status/', ChangeUserActiveStatusView.as_view(), name='change-active-status'),
     path('update-profile/', UpdateOwnProfileView.as_view(), name='update-own-profile'),
+    path('user-update/', UserUpdateAPIView.as_view(), name='user-update'),
     path('profile/', UserProfileDetailView.as_view(), name='user-profile-detail'),
     
 ]
