@@ -47,7 +47,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             'is_active',
             'is_superuser',
         ]
-        read_only_fields = ['is_verified', 'role', 'user_profile_img', 'is_staff', 'is_superuser']
+        read_only_fields = ['is_verified', 'role', 'user_profile_img', 'is_active', 'is_staff', 'is_superuser']
 
     def update(self, instance, validated_data):
         # If email changed, reset verification
@@ -59,6 +59,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         validated_data.pop('role', None)
         validated_data.pop('is_verified', None)
         validated_data.pop('user_profile_img', None)
+        validated_data.pop('is_active', None)
         validated_data.pop('is_staff', None)
         validated_data.pop('is_superuser', None)
 
