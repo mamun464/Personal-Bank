@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status,serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
-from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer,VerifyEmailSerializer,SendPasswordResetEmailSerializer,UserPasswordRestSerializer,UserActiveStatusSerializer,UserProfileUpdateSerializer,UserListSerializer
+from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer,VerifyEmailSerializer,SendPasswordResetEmailSerializer,UserPasswordRestSerializer,UserActiveStatusSerializer,UserProfileUpdateSerializer,UserListSerializer,UserUpdateSerializer
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth import login
@@ -32,6 +32,41 @@ def get_tokens_for_user(user):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
+
+class UserUpdateAPIView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthorizedUser]
+    renderer_classes = [UserRenderer]
+
+    def patch(self, request, user_id):
+        try:
+            valid_uuid = uuid.UUID(user_id.strip())  # Strip extra whitespace and validate
+            user_to_update = User.objects.get(id=valid_uuid)
+        except (ValueError, User.DoesNotExist):
+            return Response({
+                "success": False,
+                "status": 400,
+                "message": "Invalid or non-existent user ID"
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        requester = request.user
+
+        serializer = UserUpdateSerializer(user_to_update, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'success': True,
+                'status': status.HTTP_200_OK,
+                'message': f'{user_to_update.name}'s info updated successfully.',
+            }, status=status.HTTP_200_OK)
+
+        return Response({
+            'success': False,
+            'status': status.HTTP_200_OK,
+            'message': 'Invalid data provided. {str(serializer.errors)}',
+        }, status=status.HTTP_400_BAD_REQUEST)
+        
 class UserListView(APIView):
     """
     API view to get list of customers and suppliers with filtering capabilities
