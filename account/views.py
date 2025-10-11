@@ -58,7 +58,7 @@ class UserUpdateAPIView(APIView):
             return Response({
                 'success': True,
                 'status': status.HTTP_200_OK,
-                'message': f'{user_to_update.name}'s info updated successfully.',
+                'message': f"{user_to_update.name}'s info updated successfully.",
             }, status=status.HTTP_200_OK)
 
         return Response({
