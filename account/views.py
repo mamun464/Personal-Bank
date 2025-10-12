@@ -251,8 +251,18 @@ class ChangeUserActiveStatusView(APIView):
                     'status': status.HTTP_400_BAD_REQUEST,
                     'message': f'{field} is missing or empty in the params',
                 }, status=status.HTTP_400_BAD_REQUEST)
+        
+        required_fields = [ 'is_active']
+        for field in required_fields:
+            if field not in request.data or not request.data[field]:
+                return Response({
+                    'success': False,
+                    'status': status.HTTP_400_BAD_REQUEST,
+                    'message': f'{field} is missing or empty in body',
+                }, status=status.HTTP_400_BAD_REQUEST)
 
         user_id = request.query_params.get('user_id')
+        print("Received user_id:", user_id)  # Debugging line
 
         try:
                 valid_uuid = uuid.UUID(user_id.strip())  # Strip extra whitespace and validate
@@ -271,14 +281,14 @@ class ChangeUserActiveStatusView(APIView):
                 return Response({
                     "success": False,
                     "status": status.HTTP_400_BAD_REQUEST,
-                    "message": f"User is already {'active' if new_status else 'inactive'}."
+                    "message": f"{user.name} is already {'active' if new_status else 'inactive'}."
                 }, status=status.HTTP_400_BAD_REQUEST)
 
             serializer.save()
             return Response({
                 "success": True,
                 "status": status.HTTP_200_OK,
-                "message": f"User has been {'activated' if new_status else 'deactivated'} successfully."
+                "message": f"{user.name}'s account has been {'activated' if new_status else 'deactivated'} successfully."
             }, status=status.HTTP_200_OK)
 
         return Response({

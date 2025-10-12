@@ -28,7 +28,13 @@ class CanChangeActiveStatus(BasePermission):
 
     def has_permission(self, request, view):
         requester = request.user
-        user_id = view.kwargs.get('user_id')  # Assuming user_id is in the URL
+        user_id = request.query_params.get('user_id') or view.kwargs.get('user_id')
+
+        if not user_id:
+            raise PermissionDenied("Target User ID isn't received at permission check.")
+        
+        print("Requester:", requester)
+        print("Target user_id:", user_id)
 
         if requester.role not in AUTHORIZED_ROLES:
             raise PermissionDenied("Only authorized users can perform this action.")
