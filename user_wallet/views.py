@@ -245,6 +245,7 @@ class TransactionListAPIView(APIView):
             date_of_transaction = request.GET.get("date_of_transaction")
             transaction_type = request.GET.get("transaction_type")
             payment_method = request.GET.get("payment_method")
+            transaction_id = request.GET.get("transaction_id")
 
             filters = {}
             if customer:
@@ -255,10 +256,13 @@ class TransactionListAPIView(APIView):
                 filters["transaction_type__iexact"] = transaction_type
             if payment_method:
                 filters["payment_method__iexact"] = payment_method
+            if transaction_id:
+                filters["transaction_id__icontains"] = transaction_id  # ✅ Partial match support
 
+            # ✅ Apply filters dynamically
             queryset = queryset.filter(**filters)
 
-            # Apply global pagination
+            # ✅ Apply global pagination
             paginator = PageNumberPagination()
             paginated_qs = paginator.paginate_queryset(queryset, request)
             serializer = WalletTransactionListSerializer(paginated_qs, many=True)
