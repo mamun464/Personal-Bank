@@ -20,6 +20,7 @@ from django.utils.timezone import now, timedelta
 from django.db.models.functions import ExtractMonth
 from django.db.models import Sum
 from collections import defaultdict
+from datetime import datetime
 
 
 logger = logging.getLogger(__name__)
@@ -233,53 +234,129 @@ class TransactionListAPIView(APIView):
     def get(self, request):
         user = request.user
         try:
-            # ✅ Admins, employees, ceo can view all transactions
-            if user.role in AUTHORIZED_ROLES:
-                queryset = WalletTransaction.objects.all().order_by('-created_at')
-            else:
-                # ✅ Customers can only see their own transactions
-                queryset = WalletTransaction.objects.filter(customer=user).order_by('-created_at')
+            required_fields = ['date_filter_type']
+            for field in required_fields:
+                if field not in request.query_params or not request.query_params[field]:
+                    return Response({
+                        'success': False,
+                        'status': status.HTTP_400_BAD_REQUEST,
+                        'message': f'{field} is missing or empty in the params',
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            # Base queryset with related customer to avoid N+1 queries
+            queryset = WalletTransaction.objects.all().select_related('customer').order_by('-created_at')
 
-            # ✅ Dynamic filters
+            # Query params
             customer = request.GET.get("customer")
-            date_of_transaction = request.GET.get("date_of_transaction")
             transaction_type = request.GET.get("transaction_type")
             payment_method = request.GET.get("payment_method")
+            date_filter_type = request.GET.get("date_filter_type")
+            date_of_transaction = request.GET.get("date_of_transaction")
+            start_date = request.GET.get("start_date")
+            end_date = request.GET.get("end_date")
 
-            filters = {}
-            if customer:
-                filters["customer__id"] = customer
-            if date_of_transaction:
-                filters["date_of_transaction"] = date_of_transaction
+            # ----------------------------------------
+            # 🔹 Authorization & customer filtering
+            # ----------------------------------------
+            if user.role not in AUTHORIZED_ROLES:
+                # Non-authorized users can see only their own transactions
+                queryset = queryset.filter(customer=user)
+            elif customer:
+                # Authorized users can filter by specific customer if provided
+                try:
+                    customer_uuid = uuid.UUID(customer)
+                    queryset = queryset.filter(customer__id=customer_uuid)
+                except (ValueError, Exception) as e:
+                    return Response({
+                        'success': False,
+                        'status': status.HTTP_400_BAD_REQUEST,
+                        'message': f'Invalid customer UUID: {str(e)}'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+            # ----------------------------------------
+            # 🔹 Other filters
+            # ----------------------------------------
             if transaction_type:
-                filters["transaction_type__iexact"] = transaction_type
+                queryset = queryset.filter(transaction_type__iexact=transaction_type)
             if payment_method:
-                filters["payment_method__iexact"] = payment_method
+                queryset = queryset.filter(payment_method__iexact=payment_method)
 
-            queryset = queryset.filter(**filters)
+            # ----------------------------------------
+            # 🔹 Date filtering
+            # ----------------------------------------
+            if date_filter_type:
+                if date_filter_type not in ["single", "range"]:
+                    return Response({
+                        'success': False,
+                        'status': status.HTTP_400_BAD_REQUEST,
+                        'message': "Invalid value for date_filter_type. Must be 'single' or 'range'."
+                    }, status=status.HTTP_400_BAD_REQUEST)
 
-            # Apply global pagination
+                # Single date: filter if date provided
+                if date_filter_type == "single" and date_of_transaction:
+                    try:
+                        start = datetime.strptime(date_of_transaction, "%Y-%m-%d")
+                        end = start + timedelta(days=1)
+                        queryset = queryset.filter(created_at__gte=start, created_at__lt=end)
+                    except ValueError:
+                        return Response({
+                            'success': False,
+                            'status': status.HTTP_400_BAD_REQUEST,
+                            'message': "Invalid 'date_of_transaction'. Format must be YYYY-MM-DD."
+                        }, status=status.HTTP_400_BAD_REQUEST)
+
+                # Date range: start_date and end_date required
+                elif date_filter_type == "range":
+                    if not (start_date and end_date):
+                        return Response({
+                            'success': False,
+                            'status': status.HTTP_400_BAD_REQUEST,
+                            'message': "Both 'start_date' and 'end_date' are required for range filter."
+                        }, status=status.HTTP_400_BAD_REQUEST)
+
+                    try:
+                        start = datetime.strptime(start_date, "%Y-%m-%d")
+                        end = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+                    except ValueError:
+                        return Response({
+                            'success': False,
+                            'status': status.HTTP_400_BAD_REQUEST,
+                            'message': "Invalid date format. Use YYYY-MM-DD."
+                        }, status=status.HTTP_400_BAD_REQUEST)
+
+                    if end < start:
+                        return Response({
+                            'success': False,
+                            'status': status.HTTP_400_BAD_REQUEST,
+                            'message': "End date cannot be before start date."
+                        }, status=status.HTTP_400_BAD_REQUEST)
+
+                    queryset = queryset.filter(created_at__gte=start, created_at__lt=end)
+
+            # ----------------------------------------
+            # 🔹 Pagination
+            # ----------------------------------------
             paginator = PageNumberPagination()
             paginated_qs = paginator.paginate_queryset(queryset, request)
             serializer = WalletTransactionListSerializer(paginated_qs, many=True)
-            
-            retrieve_transactions = {
-                    'transactions_data': serializer.data,
-                    'pagination': {
-                        'total_items': paginator.page.paginator.count,  # Total number of products
-                        'page_size': paginator.page_size,  # Number of products per page
-                        'current_page': paginator.page.number,  # Current page number
-                        'total_pages': paginator.page.paginator.num_pages,  # Total number of pages
-                        'next': paginator.get_next_link(),  # URL for the next page
-                        'previous': paginator.get_previous_link(),  # URL for the previous page
-                    }
-                }
 
+            # ----------------------------------------
+            # 🔹 Response
+            # ----------------------------------------
             return Response({
                 'success': True,
                 'status': status.HTTP_200_OK,
                 'message': "Transaction list fetched successfully.",
-                'data': retrieve_transactions
+                'data': {
+                    'transactions_data': serializer.data,
+                    'pagination': {
+                        'total_items': paginator.page.paginator.count,
+                        'page_size': paginator.page_size,
+                        'current_page': paginator.page.number,
+                        'total_pages': paginator.page.paginator.num_pages,
+                        'next': paginator.get_next_link(),
+                        'previous': paginator.get_previous_link(),
+                    }
+                }
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -289,8 +366,7 @@ class TransactionListAPIView(APIView):
                 'status': status.HTTP_400_BAD_REQUEST,
                 'message': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
-
-
+    
 class TransactionAPIView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated,IsAuthorizedUser,IsUserVerifiedAndEnabled,IsNotCustomerSelf,TargetUserMustBeCustomer]
