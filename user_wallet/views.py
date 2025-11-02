@@ -262,13 +262,13 @@ class TransactionListAPIView(APIView):
                 queryset = queryset.filter(customer=user)
             elif customer:
                 try:
-                    customer_id = int(customer)
+                    customer_id = uuid.UUID(customer)
                     queryset = queryset.filter(customer__id=customer_id)
-                except ValueError:
+                except (ValueError, Exception) as e:
                     return Response({
                         'success': False,
                         'status': status.HTTP_400_BAD_REQUEST,
-                        'message': "Invalid customer ID"
+                        'message': "Something went wrong with customer ID filter: " + str(e)
                     }, status=status.HTTP_400_BAD_REQUEST)
 
             # ----------------------------------------
