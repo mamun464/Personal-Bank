@@ -230,7 +230,6 @@ class TransactionListAPIView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication,IsUserVerifiedAndEnabled]
     renderer_classes = [UserRenderer]
-
     def get(self, request):
         user = request.user
         try:
@@ -249,54 +248,50 @@ class TransactionListAPIView(APIView):
             customer = request.GET.get("customer")
             transaction_type = request.GET.get("transaction_type")
             payment_method = request.GET.get("payment_method")
-<<<<<<< HEAD
             date_filter_type = request.GET.get("date_filter_type")
             date_of_transaction = request.GET.get("date_of_transaction")
             start_date = request.GET.get("start_date")
             end_date = request.GET.get("end_date")
-=======
             transaction_id = request.GET.get("transaction_id")
->>>>>>> 4262ab822573bf9260fd2cb6dcfb7d13116f621c
 
             # ----------------------------------------
-            # 🔹 Authorization & customer filtering
+            # Authorization & customer filtering
             # ----------------------------------------
             if user.role not in AUTHORIZED_ROLES:
-                # Non-authorized users can see only their own transactions
+                # Non-authorized users: only their transactions
                 queryset = queryset.filter(customer=user)
             elif customer:
-                # Authorized users can filter by specific customer if provided
                 try:
-                    customer_uuid = uuid.UUID(customer)
-                    queryset = queryset.filter(customer__id=customer_uuid)
-                except (ValueError, Exception) as e:
+                    customer_id = int(customer)
+                    queryset = queryset.filter(customer__id=customer_id)
+                except ValueError:
                     return Response({
                         'success': False,
                         'status': status.HTTP_400_BAD_REQUEST,
-                        'message': f'Invalid customer UUID: {str(e)}'
+                        'message': "Invalid customer ID"
                     }, status=status.HTTP_400_BAD_REQUEST)
 
             # ----------------------------------------
-            # 🔹 Other filters
+            # Other filters
             # ----------------------------------------
+            if transaction_id:
+                queryset = queryset.filter(transaction_id__icontains=transaction_id) 
             if transaction_type:
                 queryset = queryset.filter(transaction_type__iexact=transaction_type)
             if payment_method:
-<<<<<<< HEAD
                 queryset = queryset.filter(payment_method__iexact=payment_method)
 
             # ----------------------------------------
-            # 🔹 Date filtering
+            # Date filtering
             # ----------------------------------------
             if date_filter_type:
                 if date_filter_type not in ["single", "range"]:
                     return Response({
                         'success': False,
                         'status': status.HTTP_400_BAD_REQUEST,
-                        'message': "Invalid value for date_filter_type. Must be 'single' or 'range'."
+                        'message': "date_filter_type must be 'single' or 'range'."
                     }, status=status.HTTP_400_BAD_REQUEST)
 
-                # Single date: filter if date provided
                 if date_filter_type == "single" and date_of_transaction:
                     try:
                         start = datetime.strptime(date_of_transaction, "%Y-%m-%d")
@@ -306,16 +301,15 @@ class TransactionListAPIView(APIView):
                         return Response({
                             'success': False,
                             'status': status.HTTP_400_BAD_REQUEST,
-                            'message': "Invalid 'date_of_transaction'. Format must be YYYY-MM-DD."
+                            'message': "Invalid 'date_of_transaction'. Use YYYY-MM-DD."
                         }, status=status.HTTP_400_BAD_REQUEST)
 
-                # Date range: start_date and end_date required
                 elif date_filter_type == "range":
                     if not (start_date and end_date):
                         return Response({
                             'success': False,
                             'status': status.HTTP_400_BAD_REQUEST,
-                            'message': "Both 'start_date' and 'end_date' are required for range filter."
+                            'message': "Both start_date and end_date are required for range."
                         }, status=status.HTTP_400_BAD_REQUEST)
 
                     try:
@@ -338,24 +332,14 @@ class TransactionListAPIView(APIView):
                     queryset = queryset.filter(created_at__gte=start, created_at__lt=end)
 
             # ----------------------------------------
-            # 🔹 Pagination
+            # Pagination
             # ----------------------------------------
-=======
-                filters["payment_method__iexact"] = payment_method
-            if transaction_id:
-                filters["transaction_id__icontains"] = transaction_id  # ✅ Partial match support
-
-            # ✅ Apply filters dynamically
-            queryset = queryset.filter(**filters)
-
-            # ✅ Apply global pagination
->>>>>>> 4262ab822573bf9260fd2cb6dcfb7d13116f621c
             paginator = PageNumberPagination()
             paginated_qs = paginator.paginate_queryset(queryset, request)
             serializer = WalletTransactionListSerializer(paginated_qs, many=True)
 
             # ----------------------------------------
-            # 🔹 Response
+            # Response
             # ----------------------------------------
             return Response({
                 'success': True,
@@ -374,13 +358,32 @@ class TransactionListAPIView(APIView):
                 }
             }, status=status.HTTP_200_OK)
 
-        except Exception as e:
-            logger.error(f"Transaction list error: {str(e)}")
+        # ----------------------------------------
+        # Catch specific exceptions
+        # ----------------------------------------
+        except ValueError as ve:
+            logger.error(f"Value error: {str(ve)}")
             return Response({
                 'success': False,
                 'status': status.HTTP_400_BAD_REQUEST,
-                'message': str(e)
+                'message': str(ve)
             }, status=status.HTTP_400_BAD_REQUEST)
+
+        except WalletTransaction.DoesNotExist:
+            return Response({
+                'success': False,
+                'status': status.HTTP_404_NOT_FOUND,
+                'message': "No transactions found."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            # Catch-all for unexpected errors
+            logger.error(f"Unexpected error in TransactionListAPIView: {str(e)}")
+            return Response({
+                'success': False,
+                'status': status.HTTP_500_INTERNAL_SERVER_ERROR,
+                'message': "An unexpected error occurred. Please try again later."
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 class TransactionAPIView(APIView):
     authentication_classes = [JWTAuthentication]
