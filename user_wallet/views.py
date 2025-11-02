@@ -249,10 +249,14 @@ class TransactionListAPIView(APIView):
             customer = request.GET.get("customer")
             transaction_type = request.GET.get("transaction_type")
             payment_method = request.GET.get("payment_method")
+<<<<<<< HEAD
             date_filter_type = request.GET.get("date_filter_type")
             date_of_transaction = request.GET.get("date_of_transaction")
             start_date = request.GET.get("start_date")
             end_date = request.GET.get("end_date")
+=======
+            transaction_id = request.GET.get("transaction_id")
+>>>>>>> 4262ab822573bf9260fd2cb6dcfb7d13116f621c
 
             # ----------------------------------------
             # 🔹 Authorization & customer filtering
@@ -278,6 +282,7 @@ class TransactionListAPIView(APIView):
             if transaction_type:
                 queryset = queryset.filter(transaction_type__iexact=transaction_type)
             if payment_method:
+<<<<<<< HEAD
                 queryset = queryset.filter(payment_method__iexact=payment_method)
 
             # ----------------------------------------
@@ -335,6 +340,16 @@ class TransactionListAPIView(APIView):
             # ----------------------------------------
             # 🔹 Pagination
             # ----------------------------------------
+=======
+                filters["payment_method__iexact"] = payment_method
+            if transaction_id:
+                filters["transaction_id__icontains"] = transaction_id  # ✅ Partial match support
+
+            # ✅ Apply filters dynamically
+            queryset = queryset.filter(**filters)
+
+            # ✅ Apply global pagination
+>>>>>>> 4262ab822573bf9260fd2cb6dcfb7d13116f621c
             paginator = PageNumberPagination()
             paginated_qs = paginator.paginate_queryset(queryset, request)
             serializer = WalletTransactionListSerializer(paginated_qs, many=True)
