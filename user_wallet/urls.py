@@ -8,6 +8,7 @@ urlpatterns = [
     path('dashboard-cards/', DashboardOverviewAPIView.as_view(), name='dashboard-cards'),
     path('wallet-cards/', WalletOverviewAPIView.as_view(), name='wallet-cards'),
     path('generate-statement/', GenerateStatementPdfAPIView.as_view(), name='generate-statement'),
+    path('generate-transaction-details/', SingleTransactionPDFView.as_view(), name='single_transaction_pdf'),
 
     # path('balance/', WalletBalanceView.as_view(), name='wallet-balance'),
 

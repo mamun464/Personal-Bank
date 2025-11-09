@@ -28,12 +28,92 @@ from django.http import HttpResponse
 import tempfile
 from datetime import date
 from django.contrib.staticfiles import finders
+import io
+import base64
+from barcode import Code128            
+from barcode.writer import ImageWriter  
+
 
 
 logger = logging.getLogger(__name__)
 
+
+class SingleTransactionPDFView(APIView):
+    """
+    Generate PDF for a single transaction by transaction_id
+    """
+    permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled]
+    authentication_classes = [JWTAuthentication]
+    renderer_classes = [UserRenderer]
+    def get(self, request):
+        try:
+            required_fields = ['transaction_id']
+            for field in required_fields:
+                if field not in request.query_params or not request.query_params[field]:
+                    return Response({
+                        'success': False,
+                        'status': status.HTTP_400_BAD_REQUEST,
+                        'message': f'{field} is missing or empty in the params',
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            transaction_id = request.query_params.get('transaction_id')
+            # Fetch transaction object
+            transaction = WalletTransaction.objects.select_related("customer", "processed_by").get(transaction_id=transaction_id)
+
+            user = request.user
+            customer = transaction.customer
+
+            if not (user.role in AUTHORIZED_ROLES or user.id == customer.id):
+                return Response({
+                    "success": False,
+                    "status": status.HTTP_403_FORBIDDEN,
+                    "message": "You are not authorized to download PDF for this transaction."
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # --- Generate barcode image as Base64 --- 🔹 NEW BLOCK
+            buffer = io.BytesIO()
+            Code128(transaction.transaction_id, writer=ImageWriter()).write(buffer)
+            barcode_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            buffer.close()
+
+            # Render HTML template
+            html_string = render_to_string('transaction_details.html', {
+                'transaction': transaction,
+                "today": date.today(),
+                "barcode_base64": barcode_base64,
+                "generated_by": user.name if user.id != customer.id else f"{user.name} -(Self)",
+            })
+
+            # --- Generate PDF ---
+            with tempfile.NamedTemporaryFile(delete=True) as tmpfile:
+                HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf(
+                    target=tmpfile.name
+                )
+                tmpfile.seek(0)
+                pdf_content = tmpfile.read()
+
+            # --- Return PDF response ---
+            response = HttpResponse(pdf_content, content_type="application/pdf")
+            response["Content-Disposition"] = f'attachment; filename="Transaction_{transaction.transaction_id}.pdf"'
+            return response
+
+        except WalletTransaction.DoesNotExist:
+            return Response({
+                "success": False,
+                "status": status.HTTP_404_NOT_FOUND,
+                "message": f"Transaction with id '{transaction_id}' does not exist."
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            return Response({
+                "success": False,
+                "status": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "message": f"An error occurred: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
 class GenerateStatementPdfAPIView(APIView):
-    
+    permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled]
+    authentication_classes = [JWTAuthentication]
+    renderer_classes = [UserRenderer]
     def get(self, request, *args, **kwargs):
         show_all_customers = False
         try:
@@ -64,23 +144,19 @@ class GenerateStatementPdfAPIView(APIView):
 
             # --- Build queryset based on role ---
             transactions = WalletTransaction.objects.select_related("customer", "processed_by").all()
-            print(f"Transaction length o1: {len(transactions)}")
 
             if user.role in AUTHORIZED_ROLES:
                 # Authorized user
                 if customer_id:
                     customer_id =  uuid.UUID(customer_id)
                     transactions = transactions.filter(customer_id=customer_id)
-                    print(f"Transaction Authorized length o2: {len(transactions)}")
                 else:
                     show_all_customers = True
             else:
                 # Other users can only download their own transactions
                 transactions = transactions.filter(customer=user)
-            print(f"Transaction length 2.50: {len(transactions)}")
             # Filter by date range
             transactions = transactions.filter(created_at__range=[start_date_parsed, end_date_parsed]).order_by('-created_at')
-            print(f"Transaction length 2.75: {len(transactions)}")
 
             if not transactions.exists():
                 return Response({
@@ -88,8 +164,6 @@ class GenerateStatementPdfAPIView(APIView):
                     "status": status.HTTP_404_NOT_FOUND,
                     "message": "No transactions found for the given filters."
                 }, status=status.HTTP_404_NOT_FOUND)
-            
-            print(f"Transaction length o3: {len(transactions)}")
 
             # --- Prepare customer info ---
             first_transaction = transactions.first()
