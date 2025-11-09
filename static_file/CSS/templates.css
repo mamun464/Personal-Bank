@@ -1,0 +1,139 @@
+@page {
+  margin: 20mm 15mm;
+  @bottom-right {
+    content: "Page " counter(page) " of " counter(pages);
+    font-size: 9px;
+    color: #555;
+  }
+
+  @bottom-center {
+    content: element(footer);
+  }
+
+  @bottom-left {
+    content: element(developerInfo);
+  }
+}
+
+body {
+  font-family: "Arial", sans-serif;
+  color: #333;
+  font-size: 12px;
+}
+
+.header-table {
+  width: 100%;
+  border-bottom: 2px solid #666;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-collapse: collapse;
+}
+
+/* .header-table td {
+  
+} */
+
+.logo-left {
+  width: 20%;
+  text-align: left;
+}
+
+.logo-right {
+  width: 20%;
+  text-align: right;
+  vertical-align: bottom;
+}
+
+.header-title {
+  text-align: center;
+  width: 60%;
+}
+
+.logo {
+  width: 120px;
+  height: auto;
+}
+
+.info {
+  margin-bottom: 10px;
+  line-height: 1.4; /* tighter spacing */
+}
+
+.info p {
+  margin: 2px 0; /* reduce default paragraph margin */
+}
+
+.transactions {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.transactions th {
+  background: #444;
+  color: white;
+  text-align: left;
+  padding: 6px;
+  font-size: 12px;
+}
+
+.transactions td {
+  border-bottom: 1px solid #ccc;
+  padding: 5px;
+}
+
+.transactions tr:nth-child(even) {
+  background: #f8f8f8;
+}
+
+.footer {
+  margin-top: 15px;
+  text-align: right;
+  font-size: 10px;
+  color: #555;
+  position: relative; /* allows absolute positioning for the note */
+  min-height: 50px; /* ensures some space at the bottom */
+}
+
+.page-footer {
+  position: running(footer);
+  width: 100%;
+  font-size: 10px;
+  color: #555;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #ccc;
+  padding: 2mm 5mm 0 5mm;
+}
+.page-footer .center {
+  text-align: center;
+  font-weight: bold;
+  color: #ff0000;
+}
+
+.developerInfo {
+  position: running(developerInfo);
+  font-size: 9px;
+  color: #555;
+  padding-left: 5mm;
+}
+.developerInfo a {
+  color: #0000ff; /* Initial link color */
+  text-decoration: none;
+  transition: color 0.3s ease; /* Smooth color transition */
+}
+
+.developerInfo a:hover {
+  color: #800080; /* Hover color */
+}
+.developerInfo a:visited {
+  color: #800080; /* Color after visiting */
+}
+
+thead {
+  display: table-header-group;
+}
+
+tr {
+  page-break-inside: avoid;
+}

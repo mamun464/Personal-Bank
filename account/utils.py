@@ -203,7 +203,7 @@ def generate_transaction_email_body_html(
                 <td>
                 <table style="margin-top:40px; width:100%; font-family: 'Times New Roman', Times, serif;" cellpadding="0" cellspacing="0">
                     <caption style="text-align:center; margin-bottom: 20px;">
-                    <h2>Fund transfer to other bank account</h2>
+                    <h2>Fund transfer details</h2>
                     </caption>
                     <tr>
                     <td class="detail-left">Transaction Date</td>

@@ -21,10 +21,114 @@ from django.db.models.functions import ExtractMonth
 from django.db.models import Sum
 from collections import defaultdict
 from datetime import datetime
+from django.template.loader import render_to_string
+from weasyprint import HTML, CSS
+from django.utils.dateparse import parse_date
+from django.http import HttpResponse
+import tempfile
+from datetime import date
+from django.contrib.staticfiles import finders
 
 
 logger = logging.getLogger(__name__)
 
+class GenerateStatementPdfAPIView(APIView):
+    
+    def get(self, request, *args, **kwargs):
+        show_all_customers = False
+        try:
+            user = request.user
+            customer_id = request.GET.get("customer")
+            start_date = request.GET.get("start_date")
+            end_date = request.GET.get("end_date")
+            css_path = finders.find("CSS/statement_templates.css")
+            required_fields = ['start_date', 'end_date']
+            for field in required_fields:
+                if field not in request.query_params or not request.query_params[field]:
+                    return Response({
+                        'success': False,
+                        'status': status.HTTP_400_BAD_REQUEST,
+                        'message': f'{field} is missing or empty in the params',
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+            start_date_parsed = parse_date(start_date)
+            end_date_parsed = parse_date(end_date)
+
+            if end_date_parsed < start_date_parsed:
+                return Response({
+                    'success': False,
+                    'status': status.HTTP_400_BAD_REQUEST,
+                    'message': 'End date cannot be before the start date.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+    
+
+            # --- Build queryset based on role ---
+            transactions = WalletTransaction.objects.select_related("customer", "processed_by").all()
+            print(f"Transaction length o1: {len(transactions)}")
+
+            if user.role in AUTHORIZED_ROLES:
+                # Authorized user
+                if customer_id:
+                    customer_id =  uuid.UUID(customer_id)
+                    transactions = transactions.filter(customer_id=customer_id)
+                    print(f"Transaction Authorized length o2: {len(transactions)}")
+                else:
+                    show_all_customers = True
+            else:
+                # Other users can only download their own transactions
+                transactions = transactions.filter(customer=user)
+            print(f"Transaction length 2.50: {len(transactions)}")
+            # Filter by date range
+            transactions = transactions.filter(created_at__range=[start_date_parsed, end_date_parsed]).order_by('-created_at')
+            print(f"Transaction length 2.75: {len(transactions)}")
+
+            if not transactions.exists():
+                return Response({
+                    "success": False,
+                    "status": status.HTTP_404_NOT_FOUND,
+                    "message": "No transactions found for the given filters."
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            print(f"Transaction length o3: {len(transactions)}")
+
+            # --- Prepare customer info ---
+            first_transaction = transactions.first()
+            customer = {
+                "name": first_transaction.customer.name,
+                "email": first_transaction.customer.email,
+                "phone_no": first_transaction.customer.phone_no,
+            }
+
+            # --- Render HTML ---
+            html_string = render_to_string("statement_templates.html", {
+                "customer": customer,
+                "transactions": transactions,
+                "from_date": start_date_parsed,
+                "to_date": end_date_parsed,
+                "today": date.today(),
+                "generated_by": user.name if user.id != customer.get("id") else f"{user.name} -(Self)",
+                "show_all_customers": show_all_customers, 
+            })
+            # --- Generate PDF ---
+            with tempfile.NamedTemporaryFile(delete=True) as tmpfile:
+                HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf(
+                    target=tmpfile.name,
+                )
+                tmpfile.seek(0)
+                pdf_content = tmpfile.read()
+
+            # --- Return PDF response ---
+            response = HttpResponse(pdf_content, content_type="application/pdf")
+            response["Content-Disposition"] = f'attachment; filename="Account_Statement_{customer.get("name","User")}.pdf"'
+            return response
+
+        except Exception as e:
+            return Response({
+                "success": False,
+                "status": status.HTTP_400_BAD_REQUEST,
+                "message": "Something went wrong: " + str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
 
 class WalletOverviewAPIView(APIView):
     permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled]
@@ -242,7 +346,7 @@ class TransactionListAPIView(APIView):
                         'message': f'{field} is missing or empty in the params',
                     }, status=status.HTTP_400_BAD_REQUEST)
             # Base queryset with related customer to avoid N+1 queries
-            queryset = WalletTransaction.objects.all().select_related('customer').order_by('-created_at')
+            queryset = WalletTransaction.objects.all().select_related("customer", "processed_by").order_by('-created_at')
 
             # Query params
             customer = request.GET.get("customer")

@@ -1,0 +1,103 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Account Statement</title>
+    <link rel="stylesheet" href="{% static 'CSS/templates.css' %}" />
+  </head>
+  <body>
+    <table class="header-table">
+      <tr>
+        <td class="logo-left">
+          <img
+            src="{% static 'IMAGE/bank_logo.png' %}"
+            alt="Bank_Logo"
+            class="logo"
+          />
+        </td>
+        <td class="header-title">
+          <h2>Account Statement</h2>
+        </td>
+        <td class="logo-right">
+          <img
+            src="{% static 'IMAGE/iBanking.png' %}"
+            alt="iBanking_Logo"
+            class="logo"
+          />
+        </td>
+      </tr>
+    </table>
+
+    <div class="info">
+      {% if not show_all_customers %}
+      <p><strong>Account Holder:</strong> {{ customer.name }}</p>
+      <p><strong>Email:</strong> {{ customer.email }}</p>
+      <p><strong>Phone:</strong> {{ customer.phone_no }}</p>
+      {% endif %}
+      <p><strong>Period:</strong> {{ from_date }} → {{ to_date }}</p>
+    </div>
+
+    <table class="transactions">
+      <thead>
+        <tr>
+          <th>SL#</th>
+          <th>Date</th>
+          {% if show_all_customers %}
+          <th>Name</th>
+          <th>Phone</th>
+          {% endif %}
+          <th>Transaction ID</th>
+          <th>Type</th>
+          <th>Method</th>
+          <th>Amount (Tk)</th>
+          {% if not show_all_customers %}
+          <th>Balance (Tk)</th>
+          {% endif %}
+          <th>Processed By</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for txn in transactions %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td>{{ txn.date_of_transaction }}</td>
+          {% if show_all_customers %}
+          <td>{{ txn.customer.name }}</td>
+          <td>{{ txn.customer.phone_no }}</td>
+          {% endif %}
+          <td>{{ txn.transaction_id }}</td>
+          <td>{{ txn.transaction_type|title }}</td>
+          <td>{{ txn.payment_method|title }}</td>
+          <td style="text-align: right">{{ txn.amount }}</td>
+          {% if not show_all_customers %}
+          <td style="text-align: right">{{ txn.cumulative_balance }}</td>
+          {% endif %}
+          <td>{{ txn.processed_by.name }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="footer">
+      <p>
+        Generated on {{ now|default:today }} by
+        <strong style="color: #555">{{ generated_by }}</strong>
+      </p>
+    </div>
+    <!-- Footer (placed at the end of body) -->
+    <div class="page-footer">
+      <div class="center">
+        ** This is a system-generated document. No signature is required. **
+      </div>
+    </div>
+    <div class="developerInfo">
+      <div>
+        Developed by
+        <a href="https://mrashid-portfolio.netlify.app/" target="_blank">
+          M-Rashid
+        </a>
+      </div>
+    </div>
+  </body>
+</html>
