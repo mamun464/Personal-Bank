@@ -1,5 +1,4 @@
 @page {
-  size: A4;
   margin: 30px;
 
   @bottom-right {
@@ -8,9 +7,9 @@
     color: #555;
   }
 
-  @bottom-left {
+  /* @bottom-left {
     content: element(developerInfo);
-  }
+  } */
 }
 
 body {
@@ -20,10 +19,10 @@ body {
 }
 
 .receipt-container {
-  margin-top: 80px;
+  margin-top: 195px;
   background: #fff;
   border-radius: 10px;
-  padding: 30px 40px;
+  padding: 20px 30px;
   box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -32,8 +31,8 @@ body {
   justify-content: space-between;
   align-items: center;
   border-bottom: 2px solid #207757;
-  padding-bottom: 10px;
-  margin-bottom: 20px;
+  padding-bottom: 0px;
+  margin-bottom: 5px;
 }
 
 .header-left h1 {
@@ -45,6 +44,28 @@ body {
 .header-right img {
   width: 120px;
 }
+/* Flex layout for title + barcode */
+.info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid #ddd; /* ✅ full-width underline */
+  padding-bottom: 5px;
+  margin-bottom: 10px;
+}
+
+/* Section title without border */
+.section-title-customer {
+  font-size: 18px;
+  color: #207757;
+}
+
+/* Barcode on the right */
+.barcode-inline img {
+  width: 140px;
+  height: auto;
+  opacity: 0.9;
+}
 
 .section-title {
   font-size: 18px;
@@ -52,6 +73,7 @@ body {
   border-bottom: 1px solid #ddd;
   margin-bottom: 10px;
   padding-bottom: 5px;
+  margin-top: 0px;
 }
 
 .info-grid {
@@ -76,11 +98,6 @@ body {
   margin-bottom: 25px;
 }
 
-.barcode {
-  text-align: center;
-  margin-top: 25px;
-}
-
 .footer {
   text-align: center;
   margin-top: 40px;
@@ -102,8 +119,8 @@ body {
 }
 
 .developerInfo {
-  position: running(developerInfo);
+  /* position: running(developerInfo); */
   font-size: 9px;
   color: #555;
-  padding-left: 5mm;
+  float: right;
 }
