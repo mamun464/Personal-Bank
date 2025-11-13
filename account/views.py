@@ -15,7 +15,7 @@ from drf_yasg.utils import swagger_auto_schema
 import re
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
-from account.permissions import CanChangeActiveStatus,is_authorized_role,IsAuthorizedUser,GRAND_AUTHORIZED_ROLES
+from account.permissions import hasChangePermission,is_authorized_role,IsAuthorizedUser,GRAND_AUTHORIZED_ROLES
 from drf_yasg import openapi
 import uuid
 from user_wallet.models import Wallet
@@ -35,7 +35,7 @@ def get_tokens_for_user(user):
 
 class UserUpdateAPIView(APIView):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthorizedUser]
+    permission_classes = [IsAuthorizedUser,hasChangePermission]
     renderer_classes = [UserRenderer]
 
     def patch(self, request, user_id):
@@ -222,7 +222,7 @@ class UpdateOwnProfileView(APIView):
 
 
 class ChangeUserActiveStatusView(APIView):
-    permission_classes = [IsAuthenticated, CanChangeActiveStatus]
+    permission_classes = [IsAuthenticated, hasChangePermission]
 
     @swagger_auto_schema(
         operation_description="Change the 'is_active' status of a user using query param 'user_id'",
@@ -262,7 +262,7 @@ class ChangeUserActiveStatusView(APIView):
                 }, status=status.HTTP_400_BAD_REQUEST)
 
         user_id = request.query_params.get('user_id')
-        print("Received user_id:", user_id)  # Debugging line
+        # print("Received user_id:", user_id)  # Debugging line
 
         try:
                 valid_uuid = uuid.UUID(user_id.strip())  # Strip extra whitespace and validate

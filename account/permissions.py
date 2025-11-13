@@ -18,7 +18,7 @@ ROLE_HIERARCHY = {
 
     
     
-class CanChangeActiveStatus(BasePermission):
+class hasChangePermission(BasePermission):
     """
     Custom permission to allow only authorized users to change is_active status.
     - Only users with roles in AUTHORIZED_ROLES can perform the action.
@@ -40,12 +40,12 @@ class CanChangeActiveStatus(BasePermission):
             raise PermissionDenied("Only authorized users can perform this action.")
 
         if str(requester.id) == user_id:
-            raise PermissionDenied("You are not allowed to change your own active status.")
+            raise PermissionDenied("You are not allowed to change your own information via this channel.")
 
         target_user = get_object_or_404(User, id=user_id)
 
         if ROLE_HIERARCHY[requester.role] <= ROLE_HIERARCHY[target_user.role]:
-            raise PermissionDenied("You cannot change the status of a user with the same or higher role.")
+            raise PermissionDenied("You cannot change any information of users with the same or higher role.")
 
         return True
 
