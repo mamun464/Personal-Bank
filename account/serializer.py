@@ -221,3 +221,32 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         return User.objects.create_user(**validated_data)
+
+class AuthorizedUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['name', 'email', 'phone_no', 'role','password']
+        extra_kwargs = {
+            'password': {'write_only': True}
+        }
+
+    def validate_role(self, value):
+        if value not in ['employee', 'CEO']:
+            raise serializers.ValidationError("Only 'employee' or 'CEO' roles are allowed.")
+        return value
+
+    def create(self, validated_data):
+        role = validated_data['role']
+
+        # Set flags based on role
+        if role == 'CEO':
+            validated_data['is_active'] = True
+            validated_data['is_staff'] = True
+            validated_data['is_superuser'] = True
+        else:  # employee
+            validated_data['is_active'] = True
+            validated_data['is_staff'] = True
+            validated_data['is_superuser'] = False
+        print(validated_data)
+
+        return User.objects.create_user(**validated_data)

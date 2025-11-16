@@ -16,7 +16,39 @@ ROLE_HIERARCHY = {
 }
 
 
+class CanCreateAuthorizedUser(BasePermission):
     
+    message = "You do not have permission to create this type of user."
+
+    def has_permission(self, request, view):
+        creator = request.user
+        target_role = request.data.get("role")
+
+        # Must be logged in
+        if not creator or not creator.is_authenticated:
+            raise PermissionDenied("Authentication required.")
+
+        # Only CEO and employee can use this endpoint
+        if creator.role not in GRAND_AUTHORIZED_ROLES:
+            raise PermissionDenied("Only GRAND AUTHORIZED accounts can create new users via this endpoint.")
+
+        # Only employee or CEO can be created
+        if target_role not in ['employee', 'CEO']:
+            raise PermissionDenied("You can only create 'employee' or 'CEO' accounts using this endpoint.")
+        if target_role == "CEO":
+            if User.objects.filter(role="CEO").exists():
+                raise PermissionDenied("A CEO already exists. You cannot create another CEO account.")
+
+        creator_rank = ROLE_HIERARCHY.get(creator.role, -1)
+        target_rank = ROLE_HIERARCHY.get(target_role, -1)
+
+        # Main rule: creator cannot create equal or higher rank users
+        if target_rank >= creator_rank:
+            raise PermissionDenied(
+                f"You cannot create a '{target_role}' account because it is equal to or higher than your role ('{creator.role}')."
+            )
+
+        return True   
     
 class hasChangePermission(BasePermission):
     """

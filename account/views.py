@@ -4,18 +4,18 @@ from rest_framework.response import Response
 from rest_framework import status,serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
-from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer,VerifyEmailSerializer,SendPasswordResetEmailSerializer,UserPasswordRestSerializer,UserActiveStatusSerializer,UserProfileUpdateSerializer,UserListSerializer,UserUpdateSerializer
+from account.serializer import UserRegistrationSerializer, UserProfileSerializer,UserLoginSerializer,VerifyEmailSerializer,SendPasswordResetEmailSerializer,UserPasswordRestSerializer,UserActiveStatusSerializer,UserProfileUpdateSerializer,UserListSerializer,UserUpdateSerializer,AuthorizedUserSerializer
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth import login
 from .utils import generate_unique_otp,send_email,flattened_serializer_errors,generate_otp_email_body_html
 from account.models import OtpToken,User
-from rest_framework.exceptions import AuthenticationFailed,ValidationError
+from rest_framework.exceptions import AuthenticationFailed,ValidationError,PermissionDenied
 from drf_yasg.utils import swagger_auto_schema
 import re
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
-from account.permissions import hasChangePermission,is_authorized_role,IsAuthorizedUser,GRAND_AUTHORIZED_ROLES
+from account.permissions import hasChangePermission,is_authorized_role,IsAuthorizedUser,GRAND_AUTHORIZED_ROLES,CanCreateAuthorizedUser,IsUserVerifiedAndEnabled
 from drf_yasg import openapi
 import uuid
 from user_wallet.models import Wallet
@@ -35,7 +35,7 @@ def get_tokens_for_user(user):
 
 class UserUpdateAPIView(APIView):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthorizedUser,hasChangePermission]
+    permission_classes = [IsAuthorizedUser,hasChangePermission,IsUserVerifiedAndEnabled]
     renderer_classes = [UserRenderer]
 
     def patch(self, request, user_id):
@@ -79,7 +79,7 @@ class UserListView(APIView):
     Only accessible by admin users
     """
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthorizedUser]
+    permission_classes = [IsAuthorizedUser,IsUserVerifiedAndEnabled]
     renderer_classes = [UserRenderer]
     
     def get(self, request):
@@ -146,7 +146,8 @@ class UserListView(APIView):
         
 
 class UserProfileDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled]
 
     @swagger_auto_schema(
         operation_description="Get user profile details. Admins can pass `user_id` to view others. Customers can only view their own.",
@@ -197,7 +198,8 @@ class UserProfileDetailView(APIView):
         }, status=status.HTTP_200_OK)
 
 class UpdateOwnProfileView(APIView):
-    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled]
 
     @swagger_auto_schema(request_body=UserProfileUpdateSerializer)
     def patch(self, request):
@@ -222,7 +224,8 @@ class UpdateOwnProfileView(APIView):
 
 
 class ChangeUserActiveStatusView(APIView):
-    permission_classes = [IsAuthenticated, hasChangePermission]
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated, hasChangePermission,IsUserVerifiedAndEnabled]
 
     @swagger_auto_schema(
         operation_description="Change the 'is_active' status of a user using query param 'user_id'",
@@ -377,7 +380,8 @@ class SendPasswordResetEmailView(APIView):
         }, status=status.HTTP_200_OK)
 
 class CheckEmailVerifiedView(APIView):
-    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled]
     renderer_classes = [UserRenderer]
     def get(self, request):
 
@@ -399,7 +403,7 @@ class CheckEmailVerifiedView(APIView):
 
 class ResendOtpView(APIView):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled]
     renderer_classes = [UserRenderer]
     def post(self, request):
 
@@ -505,7 +509,7 @@ class ResendOtpView(APIView):
 
 class VerifyEmailView(APIView):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled]
     renderer_classes = [UserRenderer]
 
     @swagger_auto_schema(request_body=VerifyEmailSerializer)
@@ -679,6 +683,113 @@ class UserLoginView(APIView):
                 'message': "\n".join(error_messages),
             }, status=status.HTTP_400_BAD_REQUEST)
 
+class AuthorizeUserRegistrationView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [CanCreateAuthorizedUser,IsAuthorizedUser,IsUserVerifiedAndEnabled]
+    renderer_classes = [UserRenderer]
+
+    def post(self, request, format=None):
+        # Required fields
+        required_fields = ['name', 'email', 'phone_no', 'role']
+        for field in required_fields:
+            if field not in request.data or not request.data[field]:
+                return Response({
+                    'success': False,
+                    'status': 400,
+                    'message': f"'{field}' is missing or empty in body",
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate phone number
+        phone_no = request.data.get('phone_no', '')
+        print("phone_no",phone_no)
+        phone_pattern = r'^\+?[0-9]+$'
+        if not re.match(phone_pattern, phone_no):
+            print("Phone number validation failed.")
+            return Response({
+                'success': False,
+                'status': 400,
+                'message': 'Invalid phone number. Only numbers are allowed, with an optional leading (+)',
+            }, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            print("Phone number validation passed.")
+        data_copy = request.data.copy()
+
+        # 2) Inject temporary password
+        auto_password = "123456"
+        data_copy['password'] = auto_password
+        serializer = AuthorizedUserSerializer(data=data_copy)
+
+        try:
+            if serializer.is_valid():
+                with transaction.atomic():
+                    # Create user (password auto "123456" in serializer)
+                    new_user = serializer.save()
+                    token=get_tokens_for_user(new_user)
+
+                    try:
+                        otp=OtpToken.objects.create(user=new_user,otp_code=generate_unique_otp(), otp_expires_at=timezone.now() + timezone.timedelta(hours=1))
+                    except Exception as e:
+                        return Response({
+                        'success': True,
+                        'status':200,
+                        'message': f'Registration successful & OTP create Failed',
+                        'email_sent': False,
+                        'error': f'OTP create Failed: {str(e)}'
+                        
+                        },status=status.HTTP_200_OK)
+                    
+                #Send the Mail OTP verification
+                bodyContent = generate_otp_email_body_html(new_user.name,otp.otp_code, temp_password=auto_password)
+                data={
+                    'subject': 'Email Verification Code & Default Password',
+                    'body': bodyContent,
+                    'to_email': new_user.email,
+
+                }
+
+                email_sent=send_email(data, is_html=True)
+
+                if email_sent:
+                    return Response({
+                    'success': True,
+                    'status': status.HTTP_200_OK,
+                    'message': f"{new_user.role.capitalize()} account created successfully & OTP sent to email address",
+                    'email_sent': True
+                    
+                    },status=status.HTTP_200_OK)
+                else:
+                    return Response({
+                        'success': True,
+                        'status': status.HTTP_200_OK,
+                        'message': f"{new_user.role.capitalize()} account created successfully & OTP sending failed to email address",
+                        'email_sent': True
+                        
+                    }, status=status.HTTP_200_OK)    
+
+            else:
+                # Build field: message error format like your customer view
+                errors = serializer.errors
+                msgs = [f"{field}: {msg[0]}" for field, msg in errors.items()]
+                return Response({
+                    'success': False,
+                    'status': 400,
+                    'message': "\n".join(msgs)
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        except PermissionDenied as e:
+            return Response({
+                'success': False,
+                'status': 403,
+                'message': str(e),
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'status': 500,
+                'message': f"User creation failed: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class UserRegistrationView(APIView):
     renderer_classes = [UserRenderer]
@@ -709,9 +820,6 @@ class UserRegistrationView(APIView):
                 'status': status.HTTP_400_BAD_REQUEST,
                 'message': 'Invalid phone number. Only numbers are allowed, with an optional leading (+)',
             }, status=status.HTTP_400_BAD_REQUEST)
-
-    
-        
 
         try:
             if serializer.is_valid():
@@ -753,7 +861,7 @@ class UserRegistrationView(APIView):
 
                 }
 
-                email_sent=send_email(data)
+                email_sent=send_email(data,is_html=True)
 
                 if email_sent:
                     return Response({
@@ -770,7 +878,7 @@ class UserRegistrationView(APIView):
                         'success': True,
                         'status': status.HTTP_200_OK,
                         'message': 'Registration successful & OTP sending failed to email address',
-                        'email_sent': True,
+                        'email_sent': False,
                         'user_data': user_data,
                         'token': token,
                         
@@ -795,3 +903,4 @@ class UserRegistrationView(APIView):
                 'message': f"Registration Failed: {str(e)}",
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)  
             
+

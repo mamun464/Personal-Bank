@@ -261,12 +261,21 @@ def generate_transaction_email_body_html(
 
 def generate_otp_email_body_html(
     customer_name: str,
-    otp_code: str
+    otp_code: str,
+    temp_password: str = None 
 ) -> str:
     """
     Generates a mobile responsive OTP email body with bank logo and name.
     No button, just show OTP code nicely.
     """
+    temp_password_html = ""
+    if temp_password:
+        temp_password_html = f"""
+            <!-- >>> NEW Temporary Password Section -->
+            <h3 style="color:#009900; margin-top: 30px; margin-bottom: 10px;">Your Temporary Login Password</h3>
+            <p>Please use this temporary password to log in for the first time. You should change it soon.</p>
+            <div class="otp-code">{temp_password}</div>
+        """
 
     return f"""
     <html>
@@ -384,6 +393,7 @@ def generate_otp_email_body_html(
                 <h2>Dear {customer_name},</h2>
                 <p>Use the following One-Time Password (OTP) to complete your transaction or login. This OTP is valid for <b>60 minutes</b>.</p>
                 <div class="otp-code">{otp_code}</div>
+                {temp_password_html}
                 <p>If you did not request this, please ignore this email or contact support immediately.</p>
                 <p>Thank you for banking with Personal Bank.</p>
                 </td>
