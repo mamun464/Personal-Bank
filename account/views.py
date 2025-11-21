@@ -15,7 +15,7 @@ from drf_yasg.utils import swagger_auto_schema
 import re
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
-from account.permissions import hasChangePermission,is_authorized_role,IsAuthorizedUser,GRAND_AUTHORIZED_ROLES,CanCreateAuthorizedUser,IsUserVerifiedAndEnabled
+from account.permissions import hasChangePermission,is_authorized_role,IsAuthorizedUser,GRAND_AUTHORIZED_ROLES,CanCreateAuthorizedUser,IsUserVerifiedAndEnabled,AUTHORIZED_ROLES
 from drf_yasg import openapi
 import uuid
 from user_wallet.models import Wallet
@@ -88,9 +88,14 @@ class UserListView(APIView):
             search = request.query_params.get('search', '')
             is_active = request.query_params.get('is_active')
             is_verified = request.query_params.get('is_verified')
+            filter_type = request.query_params.get('filter_type')
             
-            # Start with all users excluding admins
-            users = User.objects.exclude(role__in=GRAND_AUTHORIZED_ROLES)
+            requester = request.user
+            if filter_type == 'authorized':
+                users = User.objects.filter(role__in=AUTHORIZED_ROLES).exclude(role='admin')
+            else:
+                # Start with all users excluding admins
+                users = User.objects.exclude(role__in=AUTHORIZED_ROLES)
             
             # Apply filters
             if is_active is not None:
