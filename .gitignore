@@ -13,7 +13,7 @@ env3/
 venv3/
 
 # Secret keys
-# *.env
+*.env
 
 # Static files
 staticfiles/
