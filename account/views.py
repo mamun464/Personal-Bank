@@ -849,14 +849,11 @@ class UserRegistrationView(APIView):
                     except Exception as e:
                         return Response({
                         'success': True,
-                        'status':200,
+                        'status':500,
                         'message': f'Registration failed because OTP creation failed',
                         'email_sent': False,
                         'error': f'OTP create Failed: {str(e)}',
-                        'token': token,
-                        'user_data': user_data,
-                        
-                        },status=status.HTTP_200_OK)
+                        },status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 #Send the Mail OTP verification
                 bodyContent = generate_otp_email_body_html(new_user.name,otp.otp_code)
                 data={
