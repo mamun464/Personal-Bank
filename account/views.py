@@ -850,7 +850,7 @@ class UserRegistrationView(APIView):
                         return Response({
                         'success': True,
                         'status':200,
-                        'message': f'Registration successful & OTP create Failed',
+                        'message': f'Registration failed because OTP creation failed',
                         'email_sent': False,
                         'error': f'OTP create Failed: {str(e)}',
                         'token': token,
