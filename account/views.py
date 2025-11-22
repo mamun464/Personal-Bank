@@ -706,8 +706,7 @@ class AuthorizeUserRegistrationView(APIView):
 
         # Validate phone number
         phone_no = request.data.get('phone_no', '')
-        print("phone_no",phone_no)
-        phone_pattern = r'^\+?[0-9]+$'
+        phone_pattern = r'^\+[0-9]+$'
         if not re.match(phone_pattern, phone_no):
             print("Phone number validation failed.")
             return Response({
@@ -715,8 +714,7 @@ class AuthorizeUserRegistrationView(APIView):
                 'status': 400,
                 'message': 'Invalid phone number. Only numbers are allowed, with an optional leading (+)',
             }, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            print("Phone number validation passed.")
+        
         data_copy = request.data.copy()
 
         # 2) Inject temporary password
@@ -817,7 +815,7 @@ class UserRegistrationView(APIView):
         phone_no = request.data.get('phone_no', '')
 
         # Define a regex pattern to allow only numbers and an optional leading '+'
-        phone_no_pattern = r'^\+?[0-9]+$'
+        phone_no_pattern = r'^\+[0-9]+$'
 
         if not re.match(phone_no_pattern, phone_no):
             return Response({
