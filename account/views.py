@@ -514,7 +514,7 @@ class ResendOtpView(APIView):
 
 class VerifyEmailView(APIView):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled]
+    permission_classes = [IsAuthenticated]
     renderer_classes = [UserRenderer]
 
     @swagger_auto_schema(request_body=VerifyEmailSerializer)
