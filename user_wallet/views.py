@@ -83,12 +83,20 @@ class SingleTransactionPDFView(APIView):
                 "today": date.today(),
                 "barcode_base64": barcode_base64,
                 "generated_by": user.name if user.id != customer.id else f"{user.name} -(Self)",
+               'STATIC_ROOT': str(settings.STATIC_ROOT),  # pass absolute path for images
             })
 
+            # --- Prepare CSS path ---
+            css_path = os.path.join(settings.STATIC_ROOT, "CSS", "transaction_receipt.css")
+            if not os.path.exists(css_path):
+                raise FileNotFoundError(f"CSS file not found: {css_path}")
+
             # --- Generate PDF ---
+            html = HTML(string=html_string, base_url=str(settings.STATIC_ROOT))
             with tempfile.NamedTemporaryFile(delete=True) as tmpfile:
-                HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf(
-                    target=tmpfile.name
+                html.write_pdf(
+                    target=tmpfile.name,
+                    stylesheets=[CSS(filename=css_path)]
                 )
                 tmpfile.seek(0)
                 pdf_content = tmpfile.read()

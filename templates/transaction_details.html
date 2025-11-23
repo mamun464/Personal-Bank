@@ -5,7 +5,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Transaction Receipt</title>
-    <link rel="stylesheet" href="{% static 'CSS/transaction_receipt.css' %}" />
 
     <style></style>
   </head>
@@ -20,7 +19,7 @@
           </p>
         </div>
         <div class="header-right">
-          <img src="{% static 'IMAGE/bank_logo.png' %}" alt="Company Logo" />
+          <img src="{{ STATIC_ROOT }}/IMAGE/bank_logo.png" alt="company_logo" />
         </div>
       </div>
 
