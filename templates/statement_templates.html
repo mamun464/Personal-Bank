@@ -1,17 +1,15 @@
-{% load static %}
 <!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8" />
     <title>Account Statement</title>
-    <link rel="stylesheet" href="{% static 'CSS/templates.css' %}" />
   </head>
   <body>
     <table class="header-table">
       <tr>
         <td class="logo-left">
           <img
-            src="{% static 'IMAGE/bank_logo.png' %}"
+            src="{{ STATIC_ROOT }}/IMAGE/bank_logo.png"
             alt="Bank_Logo"
             class="logo"
           />
@@ -21,7 +19,7 @@
         </td>
         <td class="logo-right">
           <img
-            src="{% static 'IMAGE/iBanking.png' %}"
+            src="{{ STATIC_ROOT }}/IMAGE/iBanking.png"
             alt="iBanking_Logo"
             class="logo"
           />

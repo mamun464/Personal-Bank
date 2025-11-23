@@ -32,6 +32,8 @@ import io
 import base64
 from barcode import Code128            
 from barcode.writer import ImageWriter  
+from django.conf import settings
+import os
 
 
 
@@ -185,11 +187,19 @@ class GenerateStatementPdfAPIView(APIView):
                 "today": date.today(),
                 "generated_by": user.name if user.id != customer.get("id") else f"{user.name} -(Self)",
                 "show_all_customers": show_all_customers, 
+                "STATIC_ROOT": str(settings.STATIC_ROOT),
             })
+            
+            css_path = os.path.join(str(settings.STATIC_ROOT), "CSS", "templates.css")
+            if not os.path.exists(css_path):
+                raise FileNotFoundError(f"CSS file not found: {css_path}")
+
+            html = HTML(string=html_string, base_url=str(settings.STATIC_ROOT)) 
             # --- Generate PDF ---
             with tempfile.NamedTemporaryFile(delete=True) as tmpfile:
-                HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf(
+                html.write_pdf(
                     target=tmpfile.name,
+                    stylesheets=[CSS(filename=css_path)],
                 )
                 tmpfile.seek(0)
                 pdf_content = tmpfile.read()
