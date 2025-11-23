@@ -156,7 +156,10 @@ class GenerateStatementPdfAPIView(APIView):
                 # Other users can only download their own transactions
                 transactions = transactions.filter(customer=user)
             # Filter by date range
-            transactions = transactions.filter(created_at__range=[start_date_parsed, end_date_parsed]).order_by('-created_at')
+            transactions = transactions.filter(
+                                created_at__date__gte=start_date_parsed,
+                                created_at__date__lte=end_date_parsed
+                            ).order_by('-created_at')
 
             if not transactions.exists():
                 return Response({
