@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl \
     git \
-    ttf-mscorefonts-installer \
+    fonts-liberation \
     fontconfig \
  && fc-cache -f -v \
  && rm -rf /var/lib/apt/lists/*
