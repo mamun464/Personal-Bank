@@ -39,6 +39,11 @@ body {
   
 } */
 
+.transactions td,
+.transactions th {
+  white-space: nowrap;
+}
+
 .logo-left {
   width: 20%;
   text-align: left;
