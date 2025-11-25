@@ -155,6 +155,14 @@ class GenerateStatementPdfAPIView(APIView):
             # --- Build queryset based on role ---
             transactions = WalletTransaction.objects.select_related("customer", "processed_by").all()
 
+            if customer_id:
+                if not user.role in AUTHORIZED_ROLES:
+                    return Response({
+                        "success": False,
+                        "status": status.HTTP_403_FORBIDDEN,
+                        "message": "You are not authorized to download statements for other customers."
+                    }, status=status.HTTP_403_FORBIDDEN)
+                
             if user.role in AUTHORIZED_ROLES:
                 # Authorized user
                 if customer_id:
