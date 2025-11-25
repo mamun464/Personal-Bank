@@ -39,8 +39,9 @@ body {
   
 } */
 
-.transactions td,
-.transactions th {
+/* Apply nowrap only to the Date column */
+.transactions th:nth-child(2),
+.transactions td:nth-child(2) {
   white-space: nowrap;
 }
 
