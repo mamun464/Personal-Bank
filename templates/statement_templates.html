@@ -5,6 +5,21 @@
     <title>Account Statement</title>
   </head>
   <body>
+    <!-- Footer (placed at the end of body) -->
+    <div class="page-footer">
+      <div class="center">
+        ** This is a system-generated document. No signature is required. **
+      </div>
+    </div>
+    <div class="developerInfo">
+      <div>
+        Developed by
+        <a href="https://mrashid-portfolio.netlify.app/" target="_blank">
+          M-Rashid
+        </a>
+      </div>
+    </div>
+
     <table class="header-table">
       <tr>
         <td class="logo-left">
@@ -82,20 +97,6 @@
         Generated on {{ now|default:today }} by
         <strong style="color: #555">{{ generated_by }}</strong>
       </p>
-    </div>
-    <!-- Footer (placed at the end of body) -->
-    <div class="page-footer">
-      <div class="center">
-        ** This is a system-generated document. No signature is required. **
-      </div>
-    </div>
-    <div class="developerInfo">
-      <div>
-        Developed by
-        <a href="https://mrashid-portfolio.netlify.app/" target="_blank">
-          M-Rashid
-        </a>
-      </div>
     </div>
   </body>
 </html>
