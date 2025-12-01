@@ -643,6 +643,7 @@ class TransactionAPIView(APIView):
                     return Response({
                         'success': True,
                         'status': status.HTTP_200_OK,
+                        'transaction_id': instance.transaction_id,
                         'message': "Transaction successfully placed."
                     }, status=status.HTTP_200_OK)
 
