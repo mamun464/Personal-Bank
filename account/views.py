@@ -408,7 +408,7 @@ class CheckEmailVerifiedView(APIView):
 
 class ResendOtpView(APIView):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated,IsUserVerifiedAndEnabled]
+    permission_classes = [IsAuthenticated]
     renderer_classes = [UserRenderer]
     def post(self, request):
 
