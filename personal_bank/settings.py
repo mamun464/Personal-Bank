@@ -55,7 +55,7 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = 'account.User'
 
 MIDDLEWARE = [
-     "corsheaders.middleware.CorsMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -135,10 +135,21 @@ CORS_ALLOW_ALL_ORIGINS = True
 #     }
 # }
 
+# DATABASES = {
+#     'default': dj_database_url.config(
+#         default=DATABASE_URL
+#     )
+# }
+# mySQL Database Configuration
 DATABASES = {
-    'default': dj_database_url.config(
-        default=DATABASE_URL
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'Personal_Bank_DB',
+        'USER': 'root',
+        'PASSWORD': '12345678',
+        'HOST': 'localhost',  # or the hostname where your MySQL server is running
+        'PORT': '3306',      # or the port on which your MySQL server is listening
+    }
 }
 
 
