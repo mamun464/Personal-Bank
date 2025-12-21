@@ -87,9 +87,10 @@ class SingleTransactionPDFView(APIView):
             })
 
             # --- Prepare CSS path ---
-            css_path = os.path.join(settings.STATIC_ROOT, "CSS", "transaction_receipt.css")
-            if not os.path.exists(css_path):
-                raise FileNotFoundError(f"CSS file not found: {css_path}")
+            css_path = finders.find("CSS/transaction_receipt.css")
+            if not css_path:
+                raise FileNotFoundError("CSS/transaction_receipt.css not found")
+
 
             # --- Generate PDF ---
             html = HTML(string=html_string, base_url=str(settings.STATIC_ROOT))
@@ -206,9 +207,11 @@ class GenerateStatementPdfAPIView(APIView):
                 "STATIC_ROOT": str(settings.STATIC_ROOT),
             })
             
-            css_path = os.path.join(str(settings.STATIC_ROOT), "CSS", "templates.css")
-            if not os.path.exists(css_path):
-                raise FileNotFoundError(f"CSS file not found: {css_path}")
+            css_path = finders.find("CSS/templates.css")
+
+            if not css_path:
+                raise FileNotFoundError("CSS/templates.css not found in static files")
+
 
             html = HTML(string=html_string, base_url=str(settings.STATIC_ROOT)) 
             # --- Generate PDF ---
