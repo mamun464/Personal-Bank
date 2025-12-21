@@ -11,6 +11,8 @@ WORKDIR /app
 # Install system dependencies for WeasyPrint
 RUN apt-get update && apt-get install -y \
     build-essential \
+    pkg-config \
+    default-libmysqlclient-dev \
     libcairo2 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
